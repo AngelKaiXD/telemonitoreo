@@ -372,3 +372,20 @@ button, input, select, textarea { font: inherit; }
 }
 .page-header-right { display: flex; align-items: center; gap: 8px; }
 .loading-line { height: 2px; margin-bottom: 8px; }
+
+/* ── Download menu (reportes) ─────────────────────────────── */
+.download-menu { position: relative; display: inline-block; }
+.download-menu .btn svg:last-child { margin-left: 2px; }
+.download-menu-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40;
+  min-width: 150px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 4px; display: flex; flex-direction: column;
+}
+.download-menu-list button {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border: none; background: none; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; text-align: left;
+}
+.download-menu-list button:hover { background: var(--surface-alt); }
+.download-menu-list button svg { color: var(--primary-dark); }
+.download-menu-list button:disabled { opacity: .6; cursor: not-allowed; }

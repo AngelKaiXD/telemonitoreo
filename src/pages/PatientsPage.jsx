@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, Pencil, Plus, Search, UserRound } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
@@ -14,6 +14,7 @@ import {
   sourceLabel,
 } from '../utils/clinical'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
+import DownloadMenu from '../components/ui/DownloadMenu'
 
 export default function PatientsPage() {
   const { role } = useAuth()
@@ -26,6 +27,22 @@ export default function PatientsPage() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [doctorFilter, setDoctorFilter] = useState('')
+  const [generating, setGenerating] = useState(false)
+
+  async function runGeneralReport(kind) {
+    if (generating) return
+    setGenerating(true)
+    setError(null)
+    try {
+      const report = await import('../services/reportService')
+      if (kind === 'pdf') await report.generateGeneralPdf(filtered)
+      else await report.generateGeneralExcel(filtered)
+    } catch (reportError) {
+      setError(toUserMessage(reportError, 'No se pudo generar el reporte.'))
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -63,7 +80,7 @@ export default function PatientsPage() {
     }
   }, [isAdmin])
 
-  const filtered = useMemo(() => {
+  const filtered = (() => {
     const term = search.trim().toLowerCase()
     let rows = patients
     if (term) {
@@ -82,7 +99,7 @@ export default function PatientsPage() {
       )
     }
     return rows
-  }, [patients, search, doctorFilter, assignments, isAdmin])
+  })()
 
   if (loading) {
     return (
@@ -96,10 +113,19 @@ export default function PatientsPage() {
     <div>
       <div className="page-header">
         <h1>Pacientes</h1>
-        <Link className="btn btn-primary" to="/pacientes/nuevo">
-          <Plus size={16} />
-          Registrar paciente
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <DownloadMenu
+            busy={generating}
+            disabled={filtered.length === 0}
+            label="Reporte general"
+            onPdf={() => runGeneralReport('pdf')}
+            onExcel={() => runGeneralReport('excel')}
+          />
+          <Link className="btn btn-primary" to="/pacientes/nuevo">
+            <Plus size={16} />
+            Registrar paciente
+          </Link>
+        </div>
       </div>
 
       {error && <ErrorBanner message={error} />}

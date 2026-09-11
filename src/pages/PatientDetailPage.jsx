@@ -12,6 +12,7 @@ import {
   sourceLabel,
 } from '../utils/clinical'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
+import DownloadMenu from '../components/ui/DownloadMenu'
 
 const SOURCE_ICONS = {
   ble: Watch,
@@ -27,7 +28,24 @@ export default function PatientDetailPage() {
   const [readings, setReadings] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(null)
+  const [exportError, setExportError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+
+  async function runIndividualReport(kind) {
+    if (generating || !patient) return
+    setGenerating(true)
+    setExportError(null)
+    try {
+      const report = await import('../services/reportService')
+      if (kind === 'pdf') await report.generateIndividualPdf(patient, readings ?? [])
+      else await report.generateIndividualExcel(patient, readings ?? [])
+    } catch (reportError) {
+      setExportError(toUserMessage(reportError, 'No se pudo generar el reporte.'))
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -102,12 +120,20 @@ export default function PatientDetailPage() {
             <ArrowLeft size={16} />
             Volver al listado
           </Link>
+          <DownloadMenu
+            busy={generating}
+            label="Reporte individual"
+            onPdf={() => runIndividualReport('pdf')}
+            onExcel={() => runIndividualReport('excel')}
+          />
           <Link className="btn btn-primary" to={`/pacientes/${patient.id}/editar`}>
             <Edit size={16} />
             Editar paciente
           </Link>
         </div>
       </div>
+
+      {exportError && <ErrorBanner message={exportError} />}
 
       <div className="section">
         <h2 className="section-title">Datos del paciente</h2>
