@@ -156,16 +156,28 @@ export async function fetchVitalReadingsByPatient(patientId, { limit } = {}) {
  * Todas las lecturas visibles para el rol autenticado (doctor solo las de
  * sus pacientes; admin las de todos). Usado para el dashboard y filtros.
  * Incluye nombre de paciente via embed.
+ *
+ * Se pagina con `.range()` porque Supabase trunca en silencio cada respuesta
+ * a 1000 filas (db-max-rows): sin paginar, solo se veían las 1000 lecturas
+ * más recientes y las pacientes con lecturas más antiguas no aparecían en
+ * agregados como la barra de Distribución PA ("Sin medición reciente").
  */
 export async function fetchAllVitalReadings() {
-  const { data, error } = await supabase
-    .from('vital_readings')
-    .select(
-      `${READING_COLUMNS}, patients!inner(full_name)`,
-    )
-    .order('recorded_at', { ascending: false })
-  if (error) throw error
-  return data ?? []
+  const PAGE_SIZE = 1000
+  const all = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from('vital_readings')
+      .select(`${READING_COLUMNS}, patients!inner(full_name)`)
+      .order('recorded_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    all.push(...(data ?? []))
+    if (!data || data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return all
 }
 
 /**
