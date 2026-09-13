@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Pencil, Plus, Search, Stethoscope } from 'lucide-react'
+import { AlertTriangle, Pencil, Plus, Search, Stethoscope, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
-import { fetchDoctors } from '../services/api'
+import { countPatientsByDoctor, deleteDoctor, fetchDoctors } from '../services/api'
 import { toUserMessage } from '../services/errors'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
+import Modal from '../components/ui/Modal'
 
 export default function DoctorsPage() {
   const { role } = useAuth()
@@ -13,6 +14,11 @@ export default function DoctorsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteStatus, setDeleteStatus] = useState('counting')
+  const [deleteCount, setDeleteCount] = useState(0)
+  const [deleteError, setDeleteError] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -37,6 +43,51 @@ export default function DoctorsPage() {
       cancelled = true
     }
   }, [])
+
+  async function openDelete(doctor) {
+    setDeleteTarget(doctor)
+    setDeleteStatus('counting')
+    setDeleteCount(0)
+    setDeleteError(null)
+    try {
+      const n = await countPatientsByDoctor(doctor.id)
+      setDeleteCount(n)
+      setDeleteStatus(n > 0 ? 'blocked' : 'confirm')
+    } catch (countError) {
+      setDeleteError(toUserMessage(countError, 'No se pudo verificar las pacientes asignadas.'))
+      setDeleteStatus('error')
+    }
+  }
+
+  function closeDelete() {
+    if (deleting) return
+    setDeleteTarget(null)
+    setDeleteError(null)
+    setDeleteCount(0)
+  }
+
+  async function confirmDelete() {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteDoctor(deleteTarget.id)
+      setDoctors(await fetchDoctors())
+      closeDelete()
+    } catch (deleteErr) {
+      if (deleteErr?.code === '23503') {
+        setDeleteError(
+          'No se pudo eliminar: el doctor tiene registros asociados (por ejemplo su cuenta de acceso en profiles).',
+        )
+      } else {
+        setDeleteError(
+          toUserMessage(deleteErr, 'No se pudo eliminar el doctor.'),
+        )
+      }
+      setDeleteStatus('error')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -146,7 +197,7 @@ export default function DoctorsPage() {
                   <td>{doctor.license_number ?? '—'}</td>
                   {isAdmin && (
                     <td>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <Link
                           className="btn btn-outline btn-sm"
                           to={`/doctores/${doctor.id}/editar`}
@@ -154,6 +205,14 @@ export default function DoctorsPage() {
                         >
                           <Pencil size={14} />
                         </Link>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          type="button"
+                          onClick={() => openDelete(doctor)}
+                          title="Eliminar doctor"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </td>
                   )}
@@ -163,6 +222,61 @@ export default function DoctorsPage() {
           </table>
         </div>
       )}
+
+      <Modal open={deleteTarget !== null} onClose={closeDelete} title="Eliminar doctor">
+        {deleteStatus === 'counting' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Spinner size={20} />
+            <span>Verificando pacientes asignadas...</span>
+          </div>
+        )}
+
+        {deleteStatus === 'blocked' && (
+          <>
+            <p style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 0 }}>
+              <AlertTriangle size={18} style={{ flexShrink: 0, color: 'var(--danger)' }} />
+              <span>
+                Este doctor tiene <strong>{deleteCount}</strong>{' '}
+                {deleteCount === 1 ? 'paciente asignada' : 'pacientes asignadas'}.{' '}
+                Reasígnalas a otro doctor antes de eliminarlo.
+              </span>
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-primary" onClick={closeDelete}>
+                Entendido
+              </button>
+            </div>
+          </>
+        )}
+
+        {deleteStatus === 'confirm' && (
+          <>
+            <p>
+              ¿Eliminar a <strong>{deleteTarget?.first_name} {deleteTarget?.last_name}</strong> de la
+              tabla de doctores? Su cuenta de acceso no se revoca con esta acción.
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={closeDelete} disabled={deleting}>
+                Cancelar
+              </button>
+              <button className="btn btn-danger" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {deleteStatus === 'error' && (
+          <>
+            <p style={{ marginBottom: 0 }}>{deleteError}</p>
+            <div className="modal-actions">
+              <button className="btn btn-primary" onClick={closeDelete}>
+                Cerrar
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

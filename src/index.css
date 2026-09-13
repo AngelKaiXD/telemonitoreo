@@ -313,6 +313,12 @@ button, input, select, textarea { font: inherit; }
   color: var(--danger); font-weight: 600; font-size: 13px;
   display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
 }
+.info-banner {
+  background: var(--surface-alt); border: 1px solid var(--primary-strong);
+  border-radius: var(--radius-sm); padding: 12px 16px;
+  color: var(--primary-dark); font-weight: 600; font-size: 13px;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
 
 /* ── Modal / Dialog ───────────────────────────────────────── */
 .modal-backdrop {

@@ -16,13 +16,17 @@ export async function getCurrentProfile(userId) {
 // ── Patients ─────────────────────────────────────────────────────────────────
 
 const PATIENT_COLUMNS =
-  'id, full_name, document_id, age, gestation_weeks, height_cm, weight_kg, altitude, has_hypertension_history, has_preeclampsia_history, is_single, has_multiple_pregnancy, is_nulliparous, has_pregestational_diabetes, phone, address, link_code, created_at'
+  'id, full_name, document_id, age, gestation_weeks, height_cm, weight_kg, altitude, has_hypertension_history, has_preeclampsia_history, is_single, has_multiple_pregnancy, is_nulliparous, has_pregestational_diabetes, phone, address, link_code, is_active, created_at'
 
-export async function fetchPatients() {
-  const { data, error } = await supabase
-    .from('patients')
-    .select(PATIENT_COLUMNS)
-    .order('created_at', { ascending: false })
+/**
+ * Pacientes visibles para el rol autenticado. Por defecto excluye las
+ * archivadas (`is_active = true`); con `includeArchived` devuelve todas.
+ */
+export async function fetchPatients({ includeArchived = false } = {}) {
+  let query = supabase.from('patients').select(PATIENT_COLUMNS)
+  if (!includeArchived) query = query.eq('is_active', true)
+  query = query.order('created_at', { ascending: false })
+  const { data, error } = await query
   if (error) throw error
   return data ?? []
 }
@@ -148,6 +152,21 @@ export async function updateDoctor(id, patch) {
     .single()
   if (error) throw error
   return data
+}
+
+/** Pacientes asignadas a un doctor en `doctor_patients` (el Admin ve todas por RLS). */
+export async function countPatientsByDoctor(doctorId) {
+  const { count, error } = await supabase
+    .from('doctor_patients')
+    .select('patient_id', { count: 'exact', head: true })
+    .eq('doctor_id', doctorId)
+  if (error) throw error
+  return count ?? 0
+}
+
+export async function deleteDoctor(id) {
+  const { error } = await supabase.from('doctors').delete().eq('id', id)
+  if (error) throw error
 }
 
 // ── Vital readings ───────────────────────────────────────────────────────────

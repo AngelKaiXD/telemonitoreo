@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Camera, CloudDownload, Edit, HeartPulse, Radio, Watch } from 'lucide-react'
-import { fetchPatientById, fetchVitalReadingsByPatient } from '../services/api'
+import { Archive, ArchiveRestore, ArrowLeft, Camera, CloudDownload, Edit, HeartPulse, Radio, Watch } from 'lucide-react'
+import { fetchPatientById, fetchVitalReadingsByPatient, updatePatient } from '../services/api'
 import { toUserMessage } from '../services/errors'
 import { classifyBloodPressure } from '../utils/bpClassifier'
 import {
@@ -12,6 +12,7 @@ import {
   sourceLabel,
 } from '../utils/clinical'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import DownloadMenu from '../components/ui/DownloadMenu'
 
 const SOURCE_ICONS = {
@@ -31,6 +32,35 @@ export default function PatientDetailPage() {
   const [exportError, setExportError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+
+  async function archivePatient() {
+    setArchiving(true)
+    setError(null)
+    try {
+      await updatePatient(patient.id, { is_active: false })
+      setPatient((prev) => (prev ? { ...prev, is_active: false } : prev))
+      setConfirmArchiveOpen(false)
+    } catch (archiveError) {
+      setError(toUserMessage(archiveError, 'No se pudo archivar la paciente.'))
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  async function reactivatePatient() {
+    setArchiving(true)
+    setError(null)
+    try {
+      await updatePatient(patient.id, { is_active: true })
+      setPatient((prev) => (prev ? { ...prev, is_active: true } : prev))
+    } catch (reactError) {
+      setError(toUserMessage(reactError, 'No se pudo reactivar la paciente.'))
+    } finally {
+      setArchiving(false)
+    }
+  }
 
   async function runIndividualReport(kind) {
     if (generating || !patient) return
@@ -120,6 +150,17 @@ export default function PatientDetailPage() {
             <ArrowLeft size={16} />
             Volver al listado
           </Link>
+          {patient.is_active === false ? (
+            <button className="btn btn-outline" type="button" onClick={reactivatePatient} disabled={archiving}>
+              <ArchiveRestore size={16} />
+              Reactivar paciente
+            </button>
+          ) : (
+            <button className="btn btn-outline" type="button" onClick={() => setConfirmArchiveOpen(true)}>
+              <Archive size={16} />
+              Archivar paciente
+            </button>
+          )}
           <DownloadMenu
             busy={generating}
             label="Reporte individual"
@@ -132,6 +173,13 @@ export default function PatientDetailPage() {
           </Link>
         </div>
       </div>
+
+      {patient.is_active === false && (
+        <div className="info-banner">
+          Paciente archivada: no aparece en las listas por defecto, pero su historial médico se
+          conserva intacto.
+        </div>
+      )}
 
       {exportError && <ErrorBanner message={exportError} />}
 
@@ -265,6 +313,16 @@ export default function PatientDetailPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={confirmArchiveOpen}
+        onClose={() => !archiving && setConfirmArchiveOpen(false)}
+        onConfirm={archivePatient}
+        confirmLabel="Archivar"
+        loading={archiving}
+        title="Archivar paciente"
+        message={`¿Archivar a ${patient.full_name}? Dejará de aparecer en las listas por defecto, pero su historial médico se conserva intacto y podrás reactivarla desde el filtro "Ver archivadas".`}
+      />
     </div>
   )
 }

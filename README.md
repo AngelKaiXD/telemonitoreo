@@ -69,3 +69,22 @@ CREATE POLICY "doctors_update_admin"
     WHERE id = auth.uid() AND role = 'admin'
   ));
 ```
+
+Fase 13 (archivado de pacientes y borrado de doctores):
+
+- `patients.is_active boolean NOT NULL DEFAULT true`: columna añadida manualmente
+  en Supabase. Las pacientes archivadas (`is_active = false`) se ocultan de las
+  listas y del conteo del Dashboard por defecto; nunca se borran.
+- Policy de DELETE para el Admin (debe existir en la nube para poder eliminar
+  doctores):
+
+```sql
+DROP POLICY IF EXISTS "doctors_delete_admin" ON public.doctors;
+CREATE POLICY "doctors_delete_admin"
+  ON public.doctors
+  FOR DELETE
+  USING (EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  ));
+```

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, Pencil, Plus, Search, UserRound } from 'lucide-react'
+import { Archive, ArchiveRestore, Eye, Pencil, Plus, Search, UserRound } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import {
   fetchAllVitalReadings,
   fetchDoctorAssignments,
   fetchLatestMeasurements,
   fetchPatients,
+  updatePatient,
 } from '../services/api'
 import { toUserMessage } from '../services/errors'
 import {
@@ -15,6 +16,7 @@ import {
   sourceLabel,
 } from '../utils/clinical'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import DownloadMenu from '../components/ui/DownloadMenu'
 import BpGaugeBar from '../components/ui/BpGaugeBar'
 
@@ -31,6 +33,10 @@ export default function PatientsPage() {
   const [search, setSearch] = useState('')
   const [doctorFilter, setDoctorFilter] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
+  const [archiveTarget, setArchiveTarget] = useState(null)
+  const [archiving, setArchiving] = useState(false)
+  const [busyId, setBusyId] = useState(null)
 
   async function runGeneralReport(kind) {
     if (generating) return
@@ -54,7 +60,7 @@ export default function PatientsPage() {
       setError(null)
       try {
         const [patientRows, latestRows, readingRows] = await Promise.all([
-          fetchPatients(),
+          fetchPatients({ includeArchived: showArchived }),
           fetchLatestMeasurements(),
           fetchAllVitalReadings(),
         ])
@@ -102,11 +108,41 @@ export default function PatientsPage() {
     return () => {
       cancelled = true
     }
-  }, [isAdmin])
+  }, [isAdmin, showArchived])
+
+  async function confirmArchive() {
+    if (!archiveTarget) return
+    setArchiving(true)
+    setError(null)
+    try {
+      await updatePatient(archiveTarget.id, { is_active: false })
+      setPatients((rows) => rows.filter((row) => row.id !== archiveTarget.id))
+      setArchiveTarget(null)
+    } catch (archiveError) {
+      setError(toUserMessage(archiveError, 'No se pudo archivar la paciente.'))
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  async function reactivatePatient(patient) {
+    setBusyId(patient.id)
+    setError(null)
+    try {
+      await updatePatient(patient.id, { is_active: true })
+      setPatients((rows) => rows.filter((row) => row.id !== patient.id))
+    } catch (reactError) {
+      setError(toUserMessage(reactError, 'No se pudo reactivar la paciente.'))
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const filtered = (() => {
     const term = search.trim().toLowerCase()
     let rows = patients
+    if (showArchived) rows = rows.filter((patient) => patient.is_active === false)
+    else rows = rows.filter((patient) => patient.is_active !== false)
     if (term) {
       rows = rows.filter(
         (patient) =>
@@ -203,22 +239,40 @@ export default function PatientsPage() {
             </select>
           </div>
         )}
+        <div style={{ alignSelf: 'flex-end', marginBottom: 2 }}>
+          <button
+            className="btn btn-outline"
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+            {showArchived ? 'Ver activas' : 'Ver archivadas'}
+          </button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
         patients.length === 0 ? (
           <EmptyState
             icon={UserRound}
-            title="No hay pacientes"
-            description="Registra pacientes para iniciar el seguimiento clínico desde este panel."
-            actionLabel="Registrar paciente"
+            title={showArchived ? 'No hay pacientes archivadas' : 'No hay pacientes'}
+            description={
+              showArchived
+                ? 'Las pacientes archivadas aparecerán aquí para consultarlas o reactivarlas.'
+                : 'Registra pacientes para iniciar el seguimiento clínico desde este panel.'
+            }
+            actionLabel={showArchived ? undefined : 'Registrar paciente'}
             onAction={() => navigate('/pacientes/nuevo')}
           />
         ) : (
           <EmptyState
             icon={Search}
-            title="Sin resultados"
-            description="Ninguna paciente coincide con la búsqueda o el filtro actual."
+            title={showArchived ? 'No hay pacientes archivadas' : 'Sin resultados'}
+            description={
+              showArchived
+                ? 'Ninguna paciente archivada coincide con la búsqueda o el filtro.'
+                : 'Ninguna paciente coincide con la búsqueda o el filtro actual.'
+            }
           />
         )
       ) : (
@@ -305,6 +359,26 @@ export default function PatientsPage() {
                         <Link className="btn btn-outline btn-sm" to={`/pacientes/${patient.id}/editar`} title="Editar">
                           <Pencil size={14} />
                         </Link>
+                        {showArchived ? (
+                          <button
+                            className="btn btn-outline btn-sm"
+                            type="button"
+                            onClick={() => reactivatePatient(patient)}
+                            disabled={busyId === patient.id}
+                            title="Reactivar paciente"
+                          >
+                            <ArchiveRestore size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-outline btn-sm"
+                            type="button"
+                            onClick={() => setArchiveTarget(patient)}
+                            title="Archivar paciente"
+                          >
+                            <Archive size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -314,6 +388,20 @@ export default function PatientsPage() {
           </table>
         </div>
       )}
+
+      <ConfirmModal
+        open={archiveTarget !== null}
+        onClose={() => !archiving && setArchiveTarget(null)}
+        onConfirm={confirmArchive}
+        confirmLabel="Archivar"
+        loading={archiving}
+        title="Archivar paciente"
+        message={
+          archiveTarget
+            ? `¿Archivar a ${archiveTarget.full_name}? Dejará de aparecer en las listas por defecto, pero su historial médico se conserva intacto y podrás reactivarla desde "Ver archivadas".`
+            : '¿Deseas archivar esta paciente?'
+        }
+      />
     </div>
   )
 }
