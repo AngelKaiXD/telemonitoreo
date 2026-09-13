@@ -34,3 +34,13 @@ function diastolicStage(diastolic) {
   if (diastolic >= 80) return 1
   return 0
 }
+
+/**
+ * Zona JNC7/AHA en nivel 0..3 usando los mismos cortes de [classifyBloodPressure]
+ * (sistólica >=120/140/160, diastólica >=80/90/100; el mayor de ambas gana).
+ * Reutilizado por la barra de distribución de PA para que el color coincida
+ * siempre con la clasificación del resto de la app.
+ */
+export function bpZone(systolic, diastolic) {
+  return Math.max(systolicStage(systolic), diastolicStage(diastolic))
+}

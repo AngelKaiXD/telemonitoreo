@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Eye, Pencil, Plus, Search, UserRound } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import {
+  fetchAllVitalReadings,
   fetchDoctorAssignments,
   fetchLatestMeasurements,
   fetchPatients,
@@ -15,6 +16,7 @@ import {
 } from '../utils/clinical'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
 import DownloadMenu from '../components/ui/DownloadMenu'
+import BpGaugeBar from '../components/ui/BpGaugeBar'
 
 export default function PatientsPage() {
   const { role } = useAuth()
@@ -22,6 +24,7 @@ export default function PatientsPage() {
   const isAdmin = role === 'admin'
   const [patients, setPatients] = useState([])
   const [latestByPatient, setLatestByPatient] = useState({})
+  const [averagesByPatient, setAveragesByPatient] = useState({})
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -50,18 +53,39 @@ export default function PatientsPage() {
       setLoading(true)
       setError(null)
       try {
-        const [patientRows, latestRows] = await Promise.all([
+        const [patientRows, latestRows, readingRows] = await Promise.all([
           fetchPatients(),
           fetchLatestMeasurements(),
+          fetchAllVitalReadings(),
         ])
         const map = {}
         for (const latest of latestRows) {
           map[latest.patient_id] = latest
         }
+        const averages = {}
+        for (const reading of readingRows) {
+          const entry = averages[reading.patient_id] ?? {
+            sysSum: 0,
+            diaSum: 0,
+            count: 0,
+          }
+          entry.sysSum += Number(reading.systolic)
+          entry.diaSum += Number(reading.diastolic)
+          entry.count += 1
+          averages[reading.patient_id] = entry
+        }
+        for (const key of Object.keys(averages)) {
+          const entry = averages[key]
+          averages[key] = {
+            systolic: Math.round(entry.sysSum / entry.count),
+            diastolic: Math.round(entry.diaSum / entry.count),
+          }
+        }
         const assignmentRows = isAdmin ? await fetchDoctorAssignments() : []
         if (!cancelled) {
           setPatients(patientRows)
           setLatestByPatient(map)
+          setAveragesByPatient(averages)
           setAssignments(assignmentRows)
         }
       } catch (loadError) {
@@ -208,6 +232,7 @@ export default function PatientsPage() {
                 <th>Gestación</th>
                 <th>IMC</th>
                 <th>Última medición</th>
+                <th>Distribución PA</th>
                 {isAdmin && <th>Doctor asignado</th>}
                 <th style={{ textAlign: 'right' }}>Acciones</th>
               </tr>
@@ -251,6 +276,16 @@ export default function PatientsPage() {
                             {formatBoliviaDateTime(latest.recorded_at)}
                           </span>
                         </>
+                      ) : (
+                        <span className="cell-sub">Sin medición reciente</span>
+                      )}
+                    </td>
+                    <td>
+                      {averagesByPatient[patient.id] ? (
+                        <BpGaugeBar
+                          systolic={averagesByPatient[patient.id].systolic}
+                          diastolic={averagesByPatient[patient.id].diastolic}
+                        />
                       ) : (
                         <span className="cell-sub">Sin medición reciente</span>
                       )}

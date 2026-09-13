@@ -373,7 +373,7 @@ button, input, select, textarea { font: inherit; }
 .page-header-right { display: flex; align-items: center; gap: 8px; }
 .loading-line { height: 2px; margin-bottom: 8px; }
 
-/* ── Download menu (reportes) ─────────────────────────────── */
+/* ── Descargar menu (reportes) ─────────────────────────────── */
 .download-menu { position: relative; display: inline-block; }
 .download-menu .btn svg:last-child { margin-left: 2px; }
 .download-menu-list {
@@ -389,3 +389,50 @@ button, input, select, textarea { font: inherit; }
 .download-menu-list button:hover { background: var(--surface-alt); }
 .download-menu-list button svg { color: var(--primary-dark); }
 .download-menu-list button:disabled { opacity: .6; cursor: not-allowed; }
+
+/* ── Barra de distribución de PA (gauge) ──────────────────── */
+.bp-gauge { min-width: 150px; padding: 2px 0 0; user-select: none; }
+.bp-gauge-value {
+  font-size: 16px; font-weight: 900; line-height: 1.15; text-align: center;
+  color: var(--text);
+}
+.bp-gauge-track {
+  position: relative; height: 10px; margin-top: 4px; border-radius: 999px;
+  background: var(--surface-alt); overflow: visible;
+}
+.bp-gauge-colors {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #2f9e63 0%, #2f9e63 59%,
+    #e6b31a 61%, #e6b31a 79%,
+    #d64545 81%, #d64545 100%
+  );
+}
+.bp-gauge-marker {
+  position: absolute; top: 50%; width: 3px; height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px; border: 1px solid rgba(0,0,0,.25);
+}
+.bp-gauge-scale {
+  position: relative; height: 12px; margin-top: 2px;
+}
+.bp-gauge-scale span {
+  position: absolute; bottom: 0; transform: translateX(-50%);
+  font-size: 9px; color: var(--muted); white-space: nowrap;
+}
+
+/* ── Sidebar contraído ─────────────────────────────────────── */
+.app-shell.sidebar-collapsed { --sidebar-width: 64px; }
+.app-shell { transition: grid-template-columns .2s ease; }
+.sidebar { transition: width .2s ease; }
+.sidebar-collapsed .sidebar-brand { justify-content: center; padding: 16px 0; }
+.sidebar-collapsed .sidebar-brand span,
+.sidebar-collapsed .sidebar-nav a span { display: none; }
+.sidebar-collapsed .sidebar-nav a { justify-content: center; padding: 10px 0; }
+.topbar-menu {
+  background: none; border: none; cursor: pointer; margin-right: auto;
+  padding: 6px; border-radius: var(--radius-sm); color: var(--muted);
+  transition: background .15s, color .15s;
+}
+.topbar-menu:hover { background: var(--surface-alt); color: var(--text); }
