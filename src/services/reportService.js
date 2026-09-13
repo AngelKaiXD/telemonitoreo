@@ -278,7 +278,7 @@ function pdfHeader(doc, title, x, y) {
 function pdfSectionTitle(doc, text, x, y) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(14)
-  doc.setFontColor(0, 0, 0)
+  doc.setTextColor(0, 0, 0)
   doc.text(text, x, y)
   return y + 5
 }
@@ -304,7 +304,7 @@ function pdfTable(doc, { head, body, startY, margins }) {
 function pdfNote(doc, x, y) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setFontColor(120)
+  doc.setTextColor(120)
   doc.text(REPORT_NOTE, x, y)
 }
 
@@ -375,7 +375,7 @@ export async function generateGeneralPdf(patients) {
   const sectionY = pdfSectionTitle(doc, 'Resumen general', 24, 36)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setFontColor(0, 0, 0)
+  doc.setTextColor(0, 0, 0)
   doc.text(`Total de pacientes: ${patients.length}`, 24, sectionY)
   const finalY = pdfTable(doc, {
     head: [GENERAL_HEADERS],
