@@ -109,14 +109,34 @@ export async function fetchDoctorById(id) {
   return data
 }
 
-export async function createDoctor(row) {
-  const { data, error } = await supabase
-    .from('doctors')
-    .insert(row)
-    .select()
-    .single()
-  if (error) throw error
-  return data
+/**
+ * Crea la cuenta de acceso de un doctor y su fila enlazada, delegando a la
+ * Vercel Function `/api/invite-doctor` (la service_role key nunca vive en el
+ * navegador). Envía el access_token de la sesión actual para que el backend
+ * verifique que el llamador es un administrador.
+ */
+export async function inviteDoctor(doctor, redirectTo = undefined) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const res = await fetch('/api/invite-doctor', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token ?? ''}`,
+    },
+    body: JSON.stringify({ ...doctor, redirectTo }),
+  })
+  let payload = {}
+  try {
+    payload = await res.json()
+  } catch {
+    /* respuesta no-JSON (p. ej. dev server sin la función) */
+  }
+  if (!res.ok) {
+    throw new Error(payload?.error || `No se pudo invitar al doctor (HTTP ${res.status}).`)
+  }
+  return payload.doctor
 }
 
 export async function updateDoctor(id, patch) {

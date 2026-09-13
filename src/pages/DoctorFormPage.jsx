@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, MailCheck, Save, UserPlus } from 'lucide-react'
 import {
-  createDoctor,
   fetchDoctorById,
+  inviteDoctor,
   updateDoctor,
 } from '../services/api'
 import { toUserMessage } from '../services/errors'
@@ -22,6 +22,7 @@ export default function DoctorFormPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
+  const [createdEmail, setCreatedEmail] = useState(null)
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -75,6 +76,7 @@ export default function DoctorFormPage() {
   function validate() {
     const errors = {}
     const required = ['first_name', 'last_name', 'specialty', 'hospital_name']
+    if (!isEditing) required.push('email')
     for (const key of required) {
       if (!form[key].trim()) errors[key] = 'Campo requerido'
     }
@@ -102,14 +104,15 @@ export default function DoctorFormPage() {
       }
       if (isEditing) {
         await updateDoctor(id, shared)
+        navigate('/doctores', { replace: true })
       } else {
-        await createDoctor({
+        const doctor = await inviteDoctor({
           ...shared,
           id: uuidv4(),
           created_at: new Date().toISOString(),
         })
+        setCreatedEmail(doctor?.email ?? shared.email)
       }
-      navigate('/doctores', { replace: true })
     } catch (saveError) {
       setError(toUserMessage(saveError, 'No se pudo guardar el doctor.'))
     } finally {
@@ -121,6 +124,53 @@ export default function DoctorFormPage() {
     return (
       <div className="section" style={{ padding: '48px 0', display: 'flex', justifyContent: 'center' }}>
         <Spinner size={32} />
+      </div>
+    )
+  }
+
+  if (createdEmail) {
+    return (
+      <div style={{ maxWidth: 560 }}>
+        <div className="page-header">
+          <h1>Registrar doctor</h1>
+          <Link className="btn btn-outline" to="/doctores">
+            <ArrowLeft size={16} />
+            Volver al listado
+          </Link>
+        </div>
+        <div className="card" style={{ textAlign: 'center', gap: 12 }}>
+          <MailCheck size={40} style={{ color: 'var(--muted)' }} />
+          <h2 style={{ margin: 0 }}>Invitación enviada</h2>
+          <p>
+            Se envió una invitación por correo a <strong>{createdEmail}</strong> para que configure
+            su acceso. No se comparte ninguna contraseña: el doctor define la suya desde el correo
+            que reciba.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+            <button
+              className="btn btn-outline"
+              type="button"
+              onClick={() => {
+                setCreatedEmail(null)
+                setForm({
+                  first_name: '',
+                  last_name: '',
+                  specialty: '',
+                  hospital_name: '',
+                  phone: '',
+                  email: '',
+                  license_number: '',
+                })
+              }}
+            >
+              <UserPlus size={16} />
+              Registrar otro doctor
+            </button>
+            <Link className="btn btn-primary" to="/doctores">
+              Ver listado
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }
@@ -209,7 +259,9 @@ export default function DoctorFormPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="email">Correo electrónico (opcional)</label>
+            <label htmlFor="email">
+              {isEditing ? 'Correo electrónico (opcional)' : 'Correo electrónico'}
+            </label>
             <input
               id="email"
               type="email"
@@ -219,6 +271,11 @@ export default function DoctorFormPage() {
             {fieldErrors.email && (
               <span className="field-msg">{fieldErrors.email}</span>
             )}
+            {!isEditing && !fieldErrors.email && (
+              <span className="field-hint">
+                Se enviará una invitación a este correo para que el doctor configure su acceso.
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
@@ -227,7 +284,7 @@ export default function DoctorFormPage() {
             </button>
             <button className="btn btn-primary" type="submit" disabled={saving}>
               {saving ? <Spinner size={16} /> : <Save size={16} />}
-              {isEditing ? 'Actualizar doctor' : 'Guardar doctor'}
+              {isEditing ? 'Actualizar doctor' : 'Enviar invitación'}
             </button>
           </div>
         </div>

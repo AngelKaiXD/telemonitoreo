@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, HeartPulse, Lock, Mail } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { toUserMessage } from '../services/errors'
@@ -112,6 +112,11 @@ export default function LoginPage() {
             {busy ? <Spinner size={18} /> : 'Iniciar sesión'}
           </button>
         </form>
+        <div className="login-links">
+          <Link className="login-link" to="/recuperar">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
       </div>
     </div>
   )

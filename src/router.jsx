@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { FullPageLoader } from './components/ui/Feedback'
 
 const loginPage = lazy(() => import('./pages/LoginPage'))
+const recoveryPage = lazy(() => import('./pages/RecoveryPage'))
 const accessDeniedPage = lazy(() => import('./pages/AccessDeniedPage'))
 const notFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const dashboardPage = lazy(() => import('./pages/DashboardPage'))
@@ -26,6 +27,7 @@ function withSuspense(Component) {
 export const appRouter = createBrowserRouter([
   { path: '/', element: <AppRoot /> },
   { path: '/login', element: withSuspense(loginPage) },
+  { path: '/recuperar', element: withSuspense(recoveryPage) },
   { path: '/acceso-denegado', element: withSuspense(accessDeniedPage) },
   {
     path: '/',
