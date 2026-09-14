@@ -413,13 +413,32 @@ button, input, select, textarea { font: inherit; }
 }
 
 /* ── Barra de distribución de PA (gauge) ──────────────────── */
-.bp-gauge { min-width: 150px; padding: 2px 0 0; user-select: none; }
-.bp-gauge-value {
-  font-size: 16px; font-weight: 900; line-height: 1.15; text-align: center;
-  color: var(--text);
+.bp-gauge { min-width: 150px; user-select: none; }
+.bp-gauge-markers {
+  position: relative; height: 18px;
+}
+.bp-gauge-marker {
+  position: absolute; top: 0; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; line-height: 1;
+}
+.bp-gauge-marker-sys { color: var(--text); }
+.bp-gauge-marker-dia { color: var(--primary-strong); }
+.bp-gauge-label {
+  font-size: 11px; font-weight: 800; white-space: nowrap;
+}
+.bp-gauge-caret { display: block; }
+.bp-gauge-caret-down {
+  width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 7px solid currentColor;
+}
+.bp-gauge-caret-up {
+  width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 7px solid currentColor;
 }
 .bp-gauge-track {
-  position: relative; height: 10px; margin-top: 4px; border-radius: 999px;
+  position: relative; height: 10px; border-radius: 999px;
   background: var(--surface-alt); overflow: visible;
 }
 .bp-gauge-colors {
@@ -430,11 +449,6 @@ button, input, select, textarea { font: inherit; }
     #e6b31a 61%, #e6b31a 79%,
     #d64545 81%, #d64545 100%
   );
-}
-.bp-gauge-marker {
-  position: absolute; top: 50%; width: 3px; height: 14px;
-  transform: translate(-50%, -50%);
-  border-radius: 2px; border: 1px solid rgba(0,0,0,.25);
 }
 .bp-gauge-scale {
   position: relative; height: 12px; margin-top: 2px;
