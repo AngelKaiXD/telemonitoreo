@@ -16,6 +16,7 @@ async function fetchProfile(userId) {
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -34,8 +35,15 @@ export function AuthProvider({ children }) {
     })
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         setSession(newSession)
+        if (event === 'PASSWORD_RECOVERY' && newSession) {
+          setIsPasswordRecovery(true)
+        } else if (event === 'SIGNED_OUT') {
+          setIsPasswordRecovery(false)
+        } else if (event === 'INITIAL_SESSION' && !newSession) {
+          setIsPasswordRecovery(false)
+        }
         if (!newSession?.user) {
           setProfile(null)
           return
@@ -68,6 +76,7 @@ export function AuthProvider({ children }) {
     })
     if (error) throw error
     if (!data.user) throw new Error('No se pudo iniciar sesión.')
+    setIsPasswordRecovery(false)
     const next = await fetchProfile(data.user.id)
     setProfile(next)
     return data.session
@@ -85,12 +94,13 @@ export function AuthProvider({ children }) {
       profile,
       role: profile?.role ?? null,
       isStaff: profile?.role === 'doctor' || profile?.role === 'admin',
+      isPasswordRecovery,
       isLoading,
       signIn,
       signOut,
       refreshProfile,
     }),
-    [session, profile, isLoading, signIn, signOut, refreshProfile],
+    [session, profile, isPasswordRecovery, isLoading, signIn, signOut, refreshProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -4,22 +4,11 @@ import { CheckCircle2, HeartPulse, KeyRound, Mail } from 'lucide-react'
 import { supabase } from '../services/supabaseClient'
 import { useAuth } from '../context/useAuth'
 import { toUserMessage } from '../services/errors'
-import { Spinner } from '../components/ui/Feedback'
-
-function readRecoveryFromHash() {
-  const params = new URLSearchParams(window.location.hash.slice(1))
-  const access_token = params.get('access_token')
-  const refresh_token = params.get('refresh_token')
-  if (params.get('type') === 'recovery' && access_token && refresh_token) {
-    return { access_token, refresh_token }
-  }
-  return null
-}
+import { FullPageLoader, Spinner } from '../components/ui/Feedback'
 
 export default function RecoveryPage() {
   const navigate = useNavigate()
-  const { signOut } = useAuth()
-  const [recovery] = useState(readRecoveryFromHash)
+  const { signOut, isLoading, isPasswordRecovery } = useAuth()
   const [email, setEmail] = useState('')
   const [sentTo, setSentTo] = useState(null)
   const [password, setPassword] = useState('')
@@ -61,11 +50,14 @@ export default function RecoveryPage() {
     }
     setBusy(true)
     try {
-      const { error: sessionError } = await supabase.auth.setSession(recovery)
-      if (sessionError) {
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession()
+      if (!currentSession) {
         await signOut()
-        setError('El enlace de recuperación expiró o es inválido. Solicita uno nuevo desde el login.')
-        return
+        throw new Error(
+          'La sesión de recuperación expiró o es inválida. Solicita un nuevo enlace desde el login.',
+        )
       }
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) {
@@ -75,6 +67,7 @@ export default function RecoveryPage() {
       await signOut()
       setUpdated(true)
     } catch (updateError) {
+      await signOut().catch(() => {})
       setError(
         toUserMessage(
           updateError,
@@ -89,6 +82,14 @@ export default function RecoveryPage() {
   async function goToLogin() {
     await signOut()
     navigate('/login', { replace: true })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="login-page">
+        <FullPageLoader />
+      </div>
+    )
   }
 
   let content = null
@@ -106,7 +107,7 @@ export default function RecoveryPage() {
         </button>
       </>
     )
-  } else if (recovery) {
+  } else if (isPasswordRecovery) {
     content = (
       <>
         <KeyRound size={40} />

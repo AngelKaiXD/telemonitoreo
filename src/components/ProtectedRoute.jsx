@@ -4,15 +4,20 @@ import { FullPageLoader } from './ui/Feedback'
 
 /**
  * Exige sesión válida. Sin sesión redirige al login (conservando la ruta a la
- * que se intentaba entrar). Con sesión pero rol no médico/admin, muestra una
- * pantalla de acceso denegado sin revelar ningún dato.
+ * que se intentaba entrar). Una sesión de recuperación de contraseña siempre se
+ * resuelve en /recuperar, antes de evaluar el rol. Con sesión pero rol no
+ * médico/admin, muestra una pantalla de acceso denegado sin revelar ningún dato.
  */
 export default function ProtectedRoute() {
-  const { session, role, isLoading } = useAuth()
+  const { session, role, isLoading, isPasswordRecovery } = useAuth()
   const location = useLocation()
 
   if (isLoading) {
     return <FullPageLoader />
+  }
+
+  if (isPasswordRecovery) {
+    return <Navigate to="/recuperar" replace />
   }
 
   if (!session) {

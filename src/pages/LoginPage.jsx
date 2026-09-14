@@ -6,7 +6,7 @@ import { toUserMessage } from '../services/errors'
 import { Spinner } from '../components/ui/Feedback'
 
 export default function LoginPage() {
-  const { session, signIn, isLoading } = useAuth()
+  const { session, signIn, isLoading, isPasswordRecovery } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
 
   if (isLoading) return null
+  if (isPasswordRecovery) return <Navigate to="/recuperar" replace />
   if (session) return <Navigate to="/dashboard" replace />
 
   async function handleSubmit(event) {
