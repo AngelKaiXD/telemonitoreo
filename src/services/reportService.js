@@ -42,6 +42,32 @@ const READING_HEADERS = [
   'Observaciones',
 ]
 
+/**
+ * Historial completo: una fila por medición, con el perfil de la paciente
+ * repetido en cada fila. Estructura de referencia del usuario + columna
+ * `Fecha` (recorded_at en hora Bolivia) para distinguir mediciones repetidas.
+ */
+const HISTORY_HEADERS = [
+  'N.º',
+  'Fecha',
+  'Nombre',
+  'Carnet de identidad',
+  'Edad',
+  'Semanas de gestación',
+  'Talla (m)',
+  'Peso (kg)',
+  'IMC',
+  'Estado civil',
+  'Antecedente de hipertensión',
+  'Antecedente de preeclampsia',
+  'Embarazo gemelar o múltiple',
+  'Nuliparidad',
+  'Diabetes pregestacional',
+  'Presión arterial sistólica (mmHg)',
+  'Presión arterial diastólica (mmHg)',
+  'Riesgo de preeclampsia',
+]
+
 const RISK_TITLES = {
   none: 'SIN RIESGO APARENTE',
   mild: 'RIESGO LEVE - HIPERTENSION GESTACIONAL',
@@ -51,6 +77,7 @@ const RISK_TITLES = {
 
 const GENERAL_TITLE = 'Reporte general de pacientes'
 const INDIVIDUAL_TITLE = 'Reporte clinico por paciente'
+const FULL_HISTORY_TITLE = 'Historial completo de pacientes'
 const SUBTITLE = 'Sistema de telemonitorizacion medica'
 const REPORT_NOTE =
   'Nota: reporte generado para seguimiento clinico. No reemplaza valoracion medica presencial ante signos de alarma.'
@@ -224,6 +251,80 @@ function readingRow(reading) {
     reading.diagnosis,
     sourceLabel(reading.source),
     reading.observations ?? '-',
+  ]
+}
+
+/** Perfil clínico repetido en cada fila del historial (mismo formato del reporte general). */
+function profileColumns(patient) {
+  return [
+    patient.full_name,
+    patient.document_id,
+    `${patient.age}`,
+    `${patient.gestation_weeks}`,
+    heightInMeters(patient.height_cm),
+    trimZero(patient.weight_kg),
+    imcOf(patient),
+    maritalStatus(patient.is_single),
+    yesNo(patient.has_hypertension_history),
+    yesNo(patient.has_preeclampsia_history),
+    yesNo(patient.has_multiple_pregnancy),
+    yesNo(patient.is_nulliparous),
+    yesNo(patient.has_pregestational_diabetes),
+  ]
+}
+
+/**
+ * Agrupa todas las lecturas por paciente preservando el orden de entrada
+ * (fetchAllVitalReadings ya las trae ordenadas por recorded_at descendente).
+ */
+function groupReadingsByPatient(allReadings) {
+  const byPatient = {}
+  for (const reading of allReadings ?? []) {
+    const list = byPatient[reading.patient_id] ?? []
+    list.push(reading)
+    byPatient[reading.patient_id] = list
+  }
+  return byPatient
+}
+
+/**
+ * Historial completo: una fila por medición (perfil repetido). Las pacientes
+ * sin mediciones aparecen igual con 'Sin datos' en Fecha/presión/riesgo.
+ */
+function buildHistoryRows(patients, byPatient) {
+  const rows = []
+  let counter = 0
+  for (const patient of patients) {
+    const readings = byPatient[patient.id] ?? []
+    const profile = profileColumns(patient)
+    if (readings.length === 0) {
+      counter += 1
+      rows.push([`${counter}`, 'Sin datos', ...profile, 'Sin datos', 'Sin datos', 'Sin datos'])
+    } else {
+      for (const reading of readings) {
+        counter += 1
+        rows.push([
+          `${counter}`,
+          formatBoliviaReport(reading.recorded_at),
+          ...profile,
+          `${reading.systolic}`,
+          `${reading.diastolic}`,
+          riskTitle(reading.risk_level),
+        ])
+      }
+    }
+  }
+  return rows
+}
+
+function buildHistoryAoa(patients, byPatient) {
+  return [
+    [FULL_HISTORY_TITLE],
+    [SUBTITLE],
+    [generatedText()],
+    [],
+    HISTORY_HEADERS,
+    ...buildHistoryRows(patients, byPatient),
   ]
 }
 
@@ -453,5 +554,46 @@ export async function generateIndividualExcel(patient, readings) {
     buildIndividualAoa(patient, safeReadings),
     [16, 20, 10, 12, 20, 12, 14, 13, 14, 13, 13, 13, 40],
     `reporte_${safeName(patient.full_name)}_${fileDate()}.xlsx`,
+  )
+}
+
+/**
+ * Historial completo (PDF, A4 horizontal): todas las pacientes con todas sus
+ * mediciones, una fila por medición y perfil repetido. Las pacientes sin
+ * lecturas conservan una fila con sus datos de perfil.
+ */
+export async function generateFullHistoryPdf(patients, allReadings) {
+  const byPatient = groupReadingsByPatient(allReadings)
+  const totalReadings = Object.values(byPatient).reduce((sum, list) => sum + list.length, 0)
+  const margins = { left: 24, right: 24, top: 20, bottom: 18 }
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+  pdfHeader(doc, FULL_HISTORY_TITLE, 24, 18)
+  const sectionY = pdfSectionTitle(doc, 'Historial completo', 24, 36)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(0, 0, 0)
+  doc.text(
+    `Total de pacientes: ${patients.length} · Total de mediciones: ${totalReadings}`,
+    24,
+    sectionY,
+  )
+  const finalY = pdfTable(doc, {
+    head: [HISTORY_HEADERS],
+    body: buildHistoryRows(patients, byPatient),
+    startY: sectionY + 6,
+    margins,
+  })
+  finalYWithNote(doc, finalY, 24, 20)
+  doc.save(`historial_completo_${fileDate()}.pdf`)
+}
+
+/** Historial completo (Excel) sobre la lista pasada (ya filtrada por RLS/rol). */
+export async function generateFullHistoryExcel(patients, allReadings) {
+  const byPatient = groupReadingsByPatient(allReadings)
+  writeWorkbook(
+    'Historial completo',
+    buildHistoryAoa(patients, byPatient),
+    Array(HISTORY_HEADERS.length).fill(15),
+    `historial_completo_${fileDate()}.xlsx`,
   )
 }

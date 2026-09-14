@@ -26,6 +26,7 @@ export default function PatientsPage() {
   const isAdmin = role === 'admin'
   const [patients, setPatients] = useState([])
   const [latestByPatient, setLatestByPatient] = useState({})
+  const [allReadings, setAllReadings] = useState([])
   const [averagesByPatient, setAveragesByPatient] = useState({})
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +47,21 @@ export default function PatientsPage() {
       const report = await import('../services/reportService')
       if (kind === 'pdf') await report.generateGeneralPdf(filtered)
       else await report.generateGeneralExcel(filtered)
+    } catch (reportError) {
+      setError(toUserMessage(reportError, 'No se pudo generar el reporte.'))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function runHistoryReport(kind) {
+    if (generating) return
+    setGenerating(true)
+    setError(null)
+    try {
+      const report = await import('../services/reportService')
+      if (kind === 'pdf') await report.generateFullHistoryPdf(filtered, allReadings)
+      else await report.generateFullHistoryExcel(filtered, allReadings)
     } catch (reportError) {
       setError(toUserMessage(reportError, 'No se pudo generar el reporte.'))
     } finally {
@@ -91,6 +107,7 @@ export default function PatientsPage() {
         if (!cancelled) {
           setPatients(patientRows)
           setLatestByPatient(map)
+          setAllReadings(readingRows)
           setAveragesByPatient(averages)
           setAssignments(assignmentRows)
         }
@@ -177,9 +194,19 @@ export default function PatientsPage() {
           <DownloadMenu
             busy={generating}
             disabled={filtered.length === 0}
-            label="Reporte general"
-            onPdf={() => runGeneralReport('pdf')}
-            onExcel={() => runGeneralReport('excel')}
+            label="Reportes"
+            items={[
+              {
+                label: 'Reporte general',
+                onPdf: () => runGeneralReport('pdf'),
+                onExcel: () => runGeneralReport('excel'),
+              },
+              {
+                label: 'Historial completo',
+                onPdf: () => runHistoryReport('pdf'),
+                onExcel: () => runHistoryReport('excel'),
+              },
+            ]}
           />
           <Link className="btn btn-primary" to="/pacientes/nuevo">
             <Plus size={16} />
