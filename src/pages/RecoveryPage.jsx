@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle2, HeartPulse, KeyRound, Mail } from 'lucide-react'
 import { supabase } from '../services/supabaseClient'
+import { useAuth } from '../context/useAuth'
 import { toUserMessage } from '../services/errors'
 import { Spinner } from '../components/ui/Feedback'
 
@@ -16,6 +17,8 @@ function readRecoveryFromHash() {
 }
 
 export default function RecoveryPage() {
+  const navigate = useNavigate()
+  const { signOut } = useAuth()
   const [recovery] = useState(readRecoveryFromHash)
   const [email, setEmail] = useState('')
   const [sentTo, setSentTo] = useState(null)
@@ -58,20 +61,34 @@ export default function RecoveryPage() {
     }
     setBusy(true)
     try {
-      await supabase.auth.setSession(recovery)
-      await supabase.auth.updatePassword(password)
-      await supabase.auth.signOut()
+      const { error: sessionError } = await supabase.auth.setSession(recovery)
+      if (sessionError) {
+        await signOut()
+        setError('El enlace de recuperación expiró o es inválido. Solicita uno nuevo desde el login.')
+        return
+      }
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+      if (updateError) {
+        await signOut()
+        throw updateError
+      }
+      await signOut()
       setUpdated(true)
     } catch (updateError) {
       setError(
         toUserMessage(
           updateError,
-          'No se pudo restablecer la contraseña. Solicita un enlace nuevo desde el login.',
+          'No se pudo actualizar la contraseña, intenta solicitar un nuevo enlace de recuperación.',
         ),
       )
     } finally {
       setBusy(false)
     }
+  }
+
+  async function goToLogin() {
+    await signOut()
+    navigate('/login', { replace: true })
   }
 
   let content = null
@@ -82,12 +99,11 @@ export default function RecoveryPage() {
         <CheckCircle2 size={40} />
         <h1>Contraseña actualizada</h1>
         <p className="login-subtitle">
-          Tu contraseña se restableció correctamente. Ya puedes iniciar sesión con ella en la web
-          y en la app móvil.
+          Tu contraseña fue actualizada, inicia sesión con tu nueva contraseña.
         </p>
-        <Link className="btn btn-primary" to="/login">
+        <button className="btn btn-primary" type="button" onClick={goToLogin}>
           Ir a iniciar sesión
-        </Link>
+        </button>
       </>
     )
   } else if (recovery) {
@@ -122,9 +138,9 @@ export default function RecoveryPage() {
             {busy ? <Spinner size={18} /> : 'Guardar nueva contraseña'}
           </button>
         </form>
-        <Link className="login-link" to="/login">
+        <button type="button" className="login-link login-link-btn" onClick={goToLogin}>
           Volver al inicio de sesión
-        </Link>
+        </button>
       </>
     )
   } else if (sentTo) {

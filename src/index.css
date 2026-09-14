@@ -373,6 +373,10 @@ button, input, select, textarea { font: inherit; }
   display: inline-block; margin-top: 18px;
   color: var(--primary); font-weight: 600; font-size: 14px;
 }
+.login-link-btn {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit;
+}
 .login-links { margin-top: 18px; }
 .login-card .btn:not(.btn-full) { margin-top: 6px; }
 
