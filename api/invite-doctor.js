@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   }
 
   const body = req.body ?? {}
-  const doctorId = body.doctorId
+  const doctorId = body.id ?? body.doctorId
   const first_name = (body.first_name ?? '').trim()
   const last_name = (body.last_name ?? '').trim()
   const specialty = (body.specialty ?? '').trim()
