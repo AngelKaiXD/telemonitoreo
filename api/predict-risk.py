@@ -2,39 +2,48 @@
 """
 Vercel Function (Python): predicción de riesgo de preeclampsia.
 
-Sirve UNICAMENTE el modelo Random Forest ya entrenado (fase 19, aislada):
-  1. Carga una sola vez (a nivel de módulo) el modelo, el label encoder y
-     model_config.json ubicados en /model — nada se reentrena aquí.
+Sirve UNICAMENTE el modelo Random Forest ya entrenado (fase 19, aislada),
+exportado a ONNX (model/preeclampsia_rf_model.onnx) para mantener el bundle
+de la función dentro del límite de Vercel — scikit-learn + scipy (~250 MB
+instalados) excedían el tamaño máximo de función:
+  1. Carga una sola vez (a nivel de módulo) el modelo ONNX y model_config.json
+     ubicados en /model — nada se reentrena aquí.
   2. Recibe por POST: age, gestation_weeks, height_m, weight_kg, imc,
      has_hypertension_history, has_preeclampsia_history,
      has_multiple_pregnancy, is_nulliparous, has_pregestational_diabetes,
      pas, pad y sustained_htn (opcional, default 0).
   3. Devuelve { "risk": "ALTO"|"MEDIO"|"BAJO", "hypotension": true|false }.
 
-El orden de features y los umbrales de hipotensión se toman SIEMPRE de
-model_config.json (fuente de verdad, escrito por train_model.py); no se
-hardcodea ningún número aquí.
+El orden de features, el mapeo risk->índice del label encoder y los umbrales
+de hipotensión se toman SIEMPRE de model_config.json (fuente de verdad, escrito
+por train_model.py); no se hardcodea ningún número aquí.
 """
 
 import json
-import warnings
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-import joblib
 import numpy as np
+import onnxruntime as ort
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = BASE_DIR / "model"
 
 _load_error = None
-_model = None
-_label_encoder = None
+_session = None
+_input_name = None
+_label_output = None
 _config = None
 try:
     _config = json.loads((MODEL_DIR / "model_config.json").read_text(encoding="utf-8"))
-    _model = joblib.load(str(MODEL_DIR / "preeclampsia_rf_model.joblib"))
-    _label_encoder = joblib.load(str(MODEL_DIR / "preeclampsia_label_encoder.joblib"))
+    _session = ort.InferenceSession(
+        str(MODEL_DIR / "preeclampsia_rf_model.onnx"),
+        providers=["CPUExecutionProvider"],
+    )
+    _input_name = _session.get_inputs()[0].name
+    _label_output = next(
+        o.name for o in _session.get_outputs() if o.type == "tensor(int64)"
+    )
 except Exception as exc:  # noqa: BLE001 - el detalle solo queda en logs
     _load_error = exc
 
@@ -79,15 +88,12 @@ def _predict_risk(body):
         else:
             features.append(_to_number(value, column.lower()))
 
-    expected = getattr(_model, "n_features_in_", None)
-    if expected is not None and len(features) != expected:
-        raise RuntimeError("la configuración del modelo no coincide con el modelo")
-
-    matrix = np.array([features], dtype=float)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        predicted = int(_model.predict(matrix)[0])
-    risk = str(_label_encoder.inverse_transform([predicted])[0])
+    matrix = np.array([features], dtype=np.float32)
+    label = int(_session.run([_label_output], {_input_name: matrix})[0].flatten()[0])
+    try:
+        risk = str(_config["label_classes"][label])
+    except (IndexError, TypeError):
+        raise RuntimeError("la salida del modelo no corresponde a las clases conocidas")
 
     pas = float(features[_config["feature_order"].index("PAS")])
     pad = float(features[_config["feature_order"].index("PAD")])
