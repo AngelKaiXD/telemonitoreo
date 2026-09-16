@@ -1,5 +1,11 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/**/*.py": {
+      "excludeFiles": "{node_modules/**,dist/**,.git/**,.vercel/**,model/dataset_con_predicciones_preeclampsia.xlsx}"
+    }
+  }
 }

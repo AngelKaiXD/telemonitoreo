@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Python (función Vercel api/*.py)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
 # Entorno (credenciales nunca en el repositorio)
 .env
 .env.*
