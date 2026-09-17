@@ -10,6 +10,10 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
+import { useToast } from './ui/useToast'
+import NotificationsBell from './ui/NotificationsBell'
+import { jitsiUrl } from '../services/telemedicineService'
+import { onForegroundPush, pushConfigMissing, pushSupported } from '../services/pushService'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -20,7 +24,8 @@ const NAV_ITEMS = [
 const SIDEBAR_STORAGE_KEY = 'sidebar-collapsed'
 
 export default function Layout() {
-  const { role, user, signOut } = useAuth()
+  const { role, user, signOut, isStaff } = useAuth()
+  const { showToast } = useToast()
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1'
@@ -37,6 +42,42 @@ export default function Layout() {
       // almacenamiento no disponible: se ignora la preferencia
     }
   }, [collapsed])
+
+  useEffect(() => {
+    if (!isStaff || !pushSupported() || pushConfigMissing()) return undefined
+    let cancelled = false
+    let unsubscribe
+    onForegroundPush((payload) => {
+      const data = payload?.data ?? {}
+      const message =
+        payload?.notification?.body || data.reason || 'Nueva invitación de telemedicina'
+      window.dispatchEvent(new Event('telemedicine:push'))
+      showToast({
+        kind: 'notification',
+        title: 'Telemedicina',
+        message,
+        duration: 0,
+        action: data.jitsi_room
+          ? {
+              label: 'Unirse a la sala',
+              onClick: () =>
+                window.open(jitsiUrl(data.jitsi_room), '_blank', 'noopener,noreferrer'),
+            }
+          : undefined,
+      })
+    })
+      .then((unsub) => {
+        if (cancelled) unsub?.()
+        else unsubscribe = unsub
+      })
+      .catch(() => {
+        // Sin config/soporte de push: se ignora en silencio (la campanita lo avisa).
+      })
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
+  }, [isStaff, showToast])
 
   const shellClass = `app-shell${collapsed ? ' sidebar-collapsed' : ''}`
 
@@ -68,6 +109,7 @@ export default function Layout() {
           >
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
+          {isStaff && <NotificationsBell />}
           <div className="topbar-user">
             <span className="topbar-email" title={user?.email ?? ''}>
               {user?.email ?? ''}

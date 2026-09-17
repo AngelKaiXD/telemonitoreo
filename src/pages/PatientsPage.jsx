@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Archive, ArchiveRestore, Eye, Pencil, Plus, Search, UserRound } from 'lucide-react'
+import { Archive, ArchiveRestore, Eye, Pencil, Plus, Search, UserRound, Video } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import {
   fetchAllVitalReadings,
@@ -19,11 +19,13 @@ import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import DownloadMenu from '../components/ui/DownloadMenu'
 import BpGaugeBar from '../components/ui/BpGaugeBar'
+import TelemedicineModal from '../components/ui/TelemedicineModal'
 
 export default function PatientsPage() {
   const { role } = useAuth()
   const navigate = useNavigate()
   const isAdmin = role === 'admin'
+  const isDoctor = role === 'doctor'
   const [patients, setPatients] = useState([])
   const [latestByPatient, setLatestByPatient] = useState({})
   const [allReadings, setAllReadings] = useState([])
@@ -38,6 +40,7 @@ export default function PatientsPage() {
   const [archiveTarget, setArchiveTarget] = useState(null)
   const [archiving, setArchiving] = useState(false)
   const [busyId, setBusyId] = useState(null)
+  const [inviteTarget, setInviteTarget] = useState(null)
 
   async function runGeneralReport(kind) {
     if (generating) return
@@ -383,6 +386,16 @@ export default function PatientsPage() {
                         <Link className="btn btn-outline btn-sm" to={`/pacientes/${patient.id}`} title="Ver detalle">
                           <Eye size={14} />
                         </Link>
+                        {isDoctor && !showArchived && (
+                          <button
+                            className="btn btn-outline btn-sm"
+                            type="button"
+                            onClick={() => setInviteTarget(patient)}
+                            title="Iniciar videollamada de telemedicina"
+                          >
+                            <Video size={14} />
+                          </button>
+                        )}
                         <Link className="btn btn-outline btn-sm" to={`/pacientes/${patient.id}/editar`} title="Editar">
                           <Pencil size={14} />
                         </Link>
@@ -429,6 +442,13 @@ export default function PatientsPage() {
             : '¿Deseas archivar esta paciente?'
         }
       />
+
+      {inviteTarget && (
+        <TelemedicineModal
+          patient={inviteTarget}
+          onClose={() => setInviteTarget(null)}
+        />
+      )}
     </div>
   )
 }

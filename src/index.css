@@ -472,3 +472,62 @@ button, input, select, textarea { font: inherit; }
   transition: background .15s, color .15s;
 }
 .topbar-menu:hover { background: var(--surface-alt); color: var(--text); }
+
+/* ── Campanita de notificaciones ───────────────────────────── */
+.topbar-bell { position: relative; }
+.topbar-bell-dot {
+  position: absolute; top: 2px; right: 2px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: var(--danger); color: #fff;
+  font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
+}
+.push-cta {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;
+}
+.push-cta svg { color: var(--primary-dark); flex: none; margin-top: 2px; }
+.push-cta strong { display: block; font-size: 13px; }
+.push-cta p { margin: 4px 0 0; font-size: 12px; }
+.push-cta button { margin-left: auto; flex: none; }
+.push-status { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+.push-status-on { color: var(--success); font-weight: 700; }
+.notifications-loading {
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  color: var(--muted); font-size: 13px; padding: 20px 0;
+}
+.notifications-empty { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.notifications-list { list-style: none; margin: 0; padding: 0; max-height: 46vh; overflow-y: auto; }
+.notification-item { border-top: 1px solid var(--border); padding: 12px 0; }
+.notification-item:first-child { border-top: none; padding-top: 0; }
+.notification-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.notification-item p { margin: 6px 0 10px; font-size: 13px; color: var(--text); }
+
+/* ── Toasts in-app ─────────────────────────────────────────── */
+.toast-viewport {
+  position: fixed; right: 20px; bottom: 20px; z-index: 80;
+  display: flex; flex-direction: column; gap: 10px; max-width: 380px; width: calc(100vw - 40px);
+}
+.toast {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--primary);
+  border-radius: var(--radius-sm); box-shadow: 0 12px 28px rgba(0,0,0,.14); padding: 12px 14px;
+}
+.toast-notification { border-left-color: var(--primary-dark); }
+.toast-success { border-left-color: var(--success); }
+.toast-warning { border-left-color: var(--warning); }
+.toast-icon { flex: none; margin-top: 1px; color: var(--primary-dark); }
+.toast-success .toast-icon { color: var(--success); }
+.toast-warning .toast-icon { color: var(--warning); }
+.toast-body { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.toast-body strong { font-size: 13px; }
+.toast-body span { font-size: 13px; color: var(--text); }
+.toast-body .btn { align-self: flex-start; margin-top: 4px; }
+.toast-close {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  padding: 2px; border-radius: var(--radius-sm); flex: none;
+}
+.toast-close:hover { background: var(--surface-alt); color: var(--text); }
+
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
