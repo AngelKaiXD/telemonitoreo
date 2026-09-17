@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { fetchVitalReadingsByPatient } from './api'
 import { sourceLabel } from '../utils/clinical'
+import modelConfig from '../../model/model_config.json'
 
 // ─── Textos y encabezados (espejo exacto de lib/reports/report_service.dart) ──
 
@@ -65,6 +66,7 @@ const HISTORY_HEADERS = [
   'Diabetes pregestacional',
   'Presión arterial sistólica (mmHg)',
   'Presión arterial diastólica (mmHg)',
+  'Presión sostenida',
   'Riesgo de preeclampsia',
 ]
 
@@ -288,6 +290,50 @@ function groupReadingsByPatient(allReadings) {
 }
 
 /**
+ * "Presión sostenida" por lectura, con la MISMA regla de train_model.py:
+ * la medición y su inmediatamente anterior (de la misma paciente) están ambas
+ * en rango de HTN y el gap es >= sustained_hours_threshold. Se ordena por
+ * fecha (ascendente) y se marca la lectura posterior de cada par; la primera
+ * lectura de la paciente (sin previa) es siempre 'No'.
+ * Umbrales citados de model/model_config.json (no se reescriben aquí).
+ */
+function sustainedHtnByReading(readings) {
+  const { sustained_hours_threshold, htn_systolic, htn_diastolic } = modelConfig
+  const instantMs = (value) => {
+    const instant = toUtcInstant(value)
+    return instant ? instant.getTime() : null
+  }
+  const inHtnRange = (reading) =>
+    Number(reading.systolic) >= htn_systolic || Number(reading.diastolic) >= htn_diastolic
+
+  const sorted = [...(readings ?? [])].sort(
+    (a, b) => (instantMs(a.recorded_at) ?? 0) - (instantMs(b.recorded_at) ?? 0),
+  )
+  const sustained = new Map()
+  for (let i = 0; i < sorted.length; i += 1) {
+    const reading = sorted[i]
+    if (!reading.id) continue
+    if (i === 0) {
+      sustained.set(reading.id, false)
+      continue
+    }
+    const prev = sorted[i - 1]
+    const currMs = instantMs(reading.recorded_at)
+    const prevMs = instantMs(prev.recorded_at)
+    const gapHours =
+      currMs !== null && prevMs !== null ? (currMs - prevMs) / 3600000 : null
+    sustained.set(
+      reading.id,
+      inHtnRange(prev) &&
+        inHtnRange(reading) &&
+        gapHours !== null &&
+        gapHours >= sustained_hours_threshold,
+    )
+  }
+  return sustained
+}
+
+/**
  * Historial completo: una fila por medición (perfil repetido). Las pacientes
  * sin mediciones aparecen igual con 'Sin datos' en Fecha/presión/riesgo.
  */
@@ -296,10 +342,19 @@ function buildHistoryRows(patients, byPatient) {
   let counter = 0
   for (const patient of patients) {
     const readings = byPatient[patient.id] ?? []
+    const sustainedById = sustainedHtnByReading(readings)
     const profile = profileColumns(patient)
     if (readings.length === 0) {
       counter += 1
-      rows.push([`${counter}`, 'Sin datos', ...profile, 'Sin datos', 'Sin datos', 'Sin datos'])
+      rows.push([
+        `${counter}`,
+        'Sin datos',
+        ...profile,
+        'Sin datos',
+        'Sin datos',
+        'No',
+        'Sin datos',
+      ])
     } else {
       for (const reading of readings) {
         counter += 1
@@ -309,6 +364,7 @@ function buildHistoryRows(patients, byPatient) {
           ...profile,
           `${reading.systolic}`,
           `${reading.diastolic}`,
+          yesNo(sustainedById.get(reading.id) === true),
           riskTitle(reading.risk_level),
         ])
       }
