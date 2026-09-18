@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Archive, ArchiveRestore, Eye, Pencil, Plus, Search, UserRound, Video } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
@@ -14,6 +14,7 @@ import {
   formatBoliviaDateTime,
   formatNumber,
   sourceLabel,
+  sustainedHtnByReading,
 } from '../utils/clinical'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
 import ConfirmModal from '../components/ui/ConfirmModal'
@@ -157,6 +158,22 @@ export default function PatientsPage() {
       setBusyId(null)
     }
   }
+
+  const sustainedByPatient = useMemo(() => {
+    const byPatient = {}
+    for (const reading of allReadings) {
+      const list = byPatient[reading.patient_id] ?? []
+      list.push(reading)
+      byPatient[reading.patient_id] = list
+    }
+    const result = {}
+    for (const [patientId, readings] of Object.entries(byPatient)) {
+      const latest = readings[0]
+      const sustainedById = sustainedHtnByReading(readings)
+      result[patientId] = latest?.id != null && sustainedById.get(latest.id) === true
+    }
+    return result
+  }, [allReadings])
 
   const filtered = (() => {
     const term = search.trim().toLowerCase()
@@ -317,6 +334,7 @@ export default function PatientsPage() {
                 <th>IMC</th>
                 <th>Última medición</th>
                 <th>Distribución PA</th>
+                <th>Presión sostenida</th>
                 {isAdmin && <th>Doctor asignado</th>}
                 <th style={{ textAlign: 'right' }}>Acciones</th>
               </tr>
@@ -374,6 +392,7 @@ export default function PatientsPage() {
                         <span className="cell-sub">Sin medición reciente</span>
                       )}
                     </td>
+                    <td>{sustainedByPatient[patient.id] ? 'Sí' : 'No'}</td>
                     {isAdmin && (
                       <td>
                         {assignedDoctors.length > 0

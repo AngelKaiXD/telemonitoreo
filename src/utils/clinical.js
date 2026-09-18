@@ -1,4 +1,5 @@
 import { classifyBloodPressure } from './bpClassifier'
+import modelConfig from '../../model/model_config.json'
 
 /**
  * Mapa de fuentes de medición. La app móvil guarda 'bleDevice' en
@@ -86,4 +87,72 @@ export function formatBoolean(value) {
 /** Muestra un booleano de forma legible en una fila informativa. */
 export function booleanText(value) {
   return formatBoolean(value)
+}
+
+// ─── Presión sostenida (cálculo compartido web/reportes) ────────────────────
+
+/**
+ * Obtiene el instante real en UTC igual que parseStoredTimestamp de la app:
+ * un timestamp sin offset se asume como hora de pared Bolivia pre-fix y se
+ * corrige sumando 4 horas; con offset/Z se respeta tal cual.
+ */
+export function toUtcInstant(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getTime())
+  }
+  if (typeof value === 'string' && value.length > 0) {
+    const hasOffset = /(?:Z|z|[+-]\d{2}:?\d{2})$/.test(value)
+    if (hasOffset) {
+      const date = new Date(value)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+    const date = new Date(`${value}Z`)
+    if (Number.isNaN(date.getTime())) return null
+    return new Date(date.getTime() + 4 * 3600000)
+  }
+  return null
+}
+
+/**
+ * "Presión sostenida" por lectura, con la MISMA regla de train_model.py:
+ * la medición y su inmediatamente anterior (de la misma paciente) están ambas
+ * en rango de HTN y el gap es >= sustained_hours_threshold. Se ordena por
+ * fecha (ascendente) y se marca la lectura posterior de cada par; la primera
+ * lectura de la paciente (sin previa) es siempre 'No'.
+ * Umbrales citados de model/model_config.json (no se reescriben aquí).
+ */
+export function sustainedHtnByReading(readings) {
+  const { sustained_hours_threshold, htn_systolic, htn_diastolic } = modelConfig
+  const instantMs = (value) => {
+    const instant = toUtcInstant(value)
+    return instant ? instant.getTime() : null
+  }
+  const inHtnRange = (reading) =>
+    Number(reading.systolic) >= htn_systolic || Number(reading.diastolic) >= htn_diastolic
+
+  const sorted = [...(readings ?? [])].sort(
+    (a, b) => (instantMs(a.recorded_at) ?? 0) - (instantMs(b.recorded_at) ?? 0),
+  )
+  const sustained = new Map()
+  for (let i = 0; i < sorted.length; i += 1) {
+    const reading = sorted[i]
+    if (!reading.id) continue
+    if (i === 0) {
+      sustained.set(reading.id, false)
+      continue
+    }
+    const prev = sorted[i - 1]
+    const currMs = instantMs(reading.recorded_at)
+    const prevMs = instantMs(prev.recorded_at)
+    const gapHours =
+      currMs !== null && prevMs !== null ? (currMs - prevMs) / 3600000 : null
+    sustained.set(
+      reading.id,
+      inHtnRange(prev) &&
+        inHtnRange(reading) &&
+        gapHours !== null &&
+        gapHours >= sustained_hours_threshold,
+    )
+  }
+  return sustained
 }
