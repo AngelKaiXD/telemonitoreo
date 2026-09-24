@@ -89,6 +89,25 @@ export function booleanText(value) {
   return formatBoolean(value)
 }
 
+const PROTEINURIA_RESULTS = {
+  negativo: { label: 'Negativo', description: 'Sin proteinas detectables' },
+  trazas: { label: 'Trazas', description: 'Rastro minimo (proteina apenas visible)' },
+  '1+': { label: '1+', description: 'Proteinuria leve' },
+  '2+': { label: '2+', description: 'Proteinuria moderada' },
+  '3+': { label: '3+', description: 'Proteinuria importante' },
+  '4+': { label: '4+', description: 'Proteinuria severa' },
+}
+
+/**
+ * Etiqueta y descripción de un resultado de proteinuria (mismo catálogo de la
+ * app móvil, Fase 30). El resultado en sí lo define el Doctor desde la móvil;
+ * aquí solo se muestra.
+ */
+export function proteinuriaResultInfo(value) {
+  const fallback = { label: String(value ?? '—'), description: '' }
+  return PROTEINURIA_RESULTS[value] ?? fallback
+}
+
 // ─── Presión sostenida (cálculo compartido web/reportes) ────────────────────
 
 /**

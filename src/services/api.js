@@ -231,3 +231,39 @@ export async function fetchLatestMeasurements() {
   if (error) throw error
   return data ?? []
 }
+
+// ── Proteinuria ───────────────────────────────────────────────────────────────
+
+const PROTEINURIA_COLUMNS =
+  'id, patient_id, recorded_at, photo_path, result, is_positive, recorded_by'
+
+/**
+ * Pruebas de proteinuria de una paciente (más recientes primero). Solo lectura:
+ * la captura se hace exclusivamente desde la app móvil (Fase 30).
+ */
+export async function fetchProteinuriaTests(patientId) {
+  if (!patientId) return []
+  const { data, error } = await supabase
+    .from('proteinuria_tests')
+    .select(PROTEINURIA_COLUMNS)
+    .eq('patient_id', patientId)
+    .order('recorded_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * URL firmada temporal de una foto en el bucket privado `proteinuria-photos`
+ * (no se expone el bucket como público). Con 300 s de vigencia basta para la
+ * vista de detalle; las miniaturas se cargan al abrir la página.
+ */
+export async function fetchProteinuriaPhotoUrl(
+  photoPath,
+  expiresInSeconds = 300,
+) {
+  const { data, error } = await supabase.storage
+    .from('proteinuria-photos')
+    .createSignedUrl(photoPath, expiresInSeconds)
+  if (error) throw error
+  return data?.signedUrl ?? null
+}

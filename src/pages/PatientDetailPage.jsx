@@ -1,19 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Archive, ArchiveRestore, ArrowLeft, Camera, CloudDownload, Edit, HeartPulse, Radio, Watch } from 'lucide-react'
-import { fetchPatientById, fetchVitalReadingsByPatient, updatePatient } from '../services/api'
+import { Archive, ArchiveRestore, ArrowLeft, Camera, CloudDownload, Edit, HeartPulse, ImageOff, Radio, Watch } from 'lucide-react'
+import {
+  fetchPatientById,
+  fetchProteinuriaPhotoUrl,
+  fetchProteinuriaTests,
+  fetchVitalReadingsByPatient,
+  updatePatient,
+} from '../services/api'
 import { toUserMessage } from '../services/errors'
 import { classifyBloodPressure } from '../utils/bpClassifier'
 import {
   booleanText,
   formatBoliviaDateTime,
   formatNumber,
+  proteinuriaResultInfo,
   riskLevelInfo,
   sourceLabel,
 } from '../utils/clinical'
 import { EmptyState, ErrorBanner, Spinner } from '../components/ui/Feedback'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import DownloadMenu from '../components/ui/DownloadMenu'
+import Modal from '../components/ui/Modal'
 
 const SOURCE_ICONS = {
   ble: Watch,
@@ -34,6 +42,10 @@ export default function PatientDetailPage() {
   const [generating, setGenerating] = useState(false)
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [proteinuriaTests, setProteinuriaTests] = useState([])
+  const [proteinuriaPhotoUrls, setProteinuriaPhotoUrls] = useState({})
+  const [proteinuriaError, setProteinuriaError] = useState(null)
+  const [lightbox, setLightbox] = useState(null)
 
   async function archivePatient() {
     setArchiving(true)
@@ -102,6 +114,47 @@ export default function PatientDetailPage() {
         }
       } finally {
         if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  // Historial de proteinuria (solo lectura, Fase 31). Si la tabla aún no
+  // existe o la RLS no permite leerla, no rompe la página: muestra un aviso.
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setProteinuriaError(null)
+      try {
+        const tests = await fetchProteinuriaTests(id)
+        if (cancelled) return
+        setProteinuriaTests(tests)
+        const urls = {}
+        await Promise.all(
+          tests.map(async (test) => {
+            try {
+              const url = await fetchProteinuriaPhotoUrl(test.photo_path)
+              if (!cancelled) urls[test.id] = url
+            } catch {
+              // la foto no pudo firmarse; su miniatura muestra el marcador
+            }
+          }),
+        )
+        if (!cancelled) setProteinuriaPhotoUrls(urls)
+      } catch (loadError) {
+        if (!cancelled) {
+          setProteinuriaTests([])
+          setProteinuriaPhotoUrls({})
+          setProteinuriaError(
+            toUserMessage(
+              loadError,
+              'No se pudieron cargar las pruebas de proteinuria.',
+            ),
+          )
+        }
       }
     }
     load()
@@ -314,6 +367,87 @@ export default function PatientDetailPage() {
         )}
       </div>
 
+      <div className="section">
+        <h2 className="section-title">Pruebas de proteinuria</h2>
+        {proteinuriaError ? (
+          <p className="field-error">
+            <span className="field-msg">{proteinuriaError}</span>
+          </p>
+        ) : proteinuriaTests.length === 0 ? (
+          <p className="cell-sub">
+            Sin pruebas de proteinuria registradas desde la app móvil.
+          </p>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Fecha y hora (Bolivia)</th>
+                  <th>Resultado</th>
+                  <th>Foto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proteinuriaTests.map((test) => {
+                  const info = proteinuriaResultInfo(test.result)
+                  const url = proteinuriaPhotoUrls[test.id]
+                  return (
+                    <tr key={test.id}>
+                      <td className="cell-sub">
+                        {formatBoliviaDateTime(test.recorded_at)}
+                      </td>
+                      <td>
+                        <div className="cell-main">
+                          {info.label}
+                          <span
+                            className={`badge ${test.is_positive ? 'badge-danger' : 'badge-success'}`}
+                            style={{ marginLeft: 8 }}
+                          >
+                            {test.is_positive ? 'Positivo' : 'Negativo'}
+                          </span>
+                        </div>
+                        {info.description && (
+                          <div className="cell-sub">{info.description}</div>
+                        )}
+                      </td>
+                      <td>
+                        {url ? (
+                          <button
+                            type="button"
+                            className="proteinuria-thumb"
+                            onClick={() =>
+                              setLightbox({
+                                url,
+                                label: info.label,
+                                recordedAt: test.recorded_at,
+                              })
+                            }
+                            title="Ampliar foto de la tira"
+                            aria-label="Ampliar foto de la tira"
+                          >
+                            <img
+                              src={url}
+                              alt={`Foto de proteinuria ${info.label}`}
+                            />
+                          </button>
+                        ) : (
+                          <span
+                            className="proteinuria-thumb proteinuria-thumb-empty"
+                            title="Foto no disponible"
+                          >
+                            <ImageOff size={20} />
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <ConfirmModal
         open={confirmArchiveOpen}
         onClose={() => !archiving && setConfirmArchiveOpen(false)}
@@ -323,6 +457,27 @@ export default function PatientDetailPage() {
         title="Archivar paciente"
         message={`¿Archivar a ${patient.full_name}? Dejará de aparecer en las listas por defecto, pero su historial médico se conserva intacto y podrás reactivarla desde el filtro "Ver archivadas".`}
       />
+
+      <Modal
+        open={lightbox !== null}
+        onClose={() => setLightbox(null)}
+        title="Foto de la tira de proteinuria"
+      >
+        {lightbox && (
+          <>
+            <div style={{ textAlign: 'center' }}>
+              <img
+                src={lightbox.url}
+                alt={`Foto de proteinuria ${lightbox.label}`}
+                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 'var(--radius-sm)' }}
+              />
+            </div>
+            <p className="cell-sub" style={{ textAlign: 'center', marginTop: 10 }}>
+              {lightbox.label} · {formatBoliviaDateTime(lightbox.recordedAt)}
+            </p>
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

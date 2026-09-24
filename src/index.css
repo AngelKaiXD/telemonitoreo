@@ -503,6 +503,20 @@ button, input, select, textarea { font: inherit; }
 .notification-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .notification-item p { margin: 6px 0 10px; font-size: 13px; color: var(--text); }
 
+/* ── Miniatura de foto de proteinuria ────────────────────────────────────── */
+.proteinuria-thumb {
+  width: 56px; height: 56px; padding: 0; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); overflow: hidden; cursor: pointer;
+  background: var(--surface);
+}
+.proteinuria-thumb img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.proteinuria-thumb-empty {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); cursor: default;
+}
+
 /* ── Toasts in-app ─────────────────────────────────────────── */
 .toast-viewport {
   position: fixed; right: 20px; bottom: 20px; z-index: 80;
