@@ -21,6 +21,13 @@ const GENERAL_HEADERS = [
   'Embarazo gemelar o múltiple',
   'Nuliparidad',
   'Diabetes pregestacional',
+  'Hipertensión crónica',
+  'Enfermedad renal',
+  'Lupus',
+  'Síndrome antifosfolípido',
+  'Intervalo intergenésico anormal',
+  'Antecedentes familiares',
+  'Fecundación asistida (TRA)',
   'Presión arterial sistólica (mmHg)',
   'Presión arterial diastólica (mmHg)',
   'Riesgo de preeclampsia',
@@ -63,6 +70,13 @@ const HISTORY_HEADERS = [
   'Embarazo gemelar o múltiple',
   'Nuliparidad',
   'Diabetes pregestacional',
+  'Hipertensión crónica',
+  'Enfermedad renal',
+  'Lupus',
+  'Síndrome antifosfolípido',
+  'Intervalo intergenésico anormal',
+  'Antecedentes familiares',
+  'Fecundación asistida (TRA)',
   'Presión arterial sistólica (mmHg)',
   'Presión arterial diastólica (mmHg)',
   'Presión sostenida',
@@ -120,6 +134,13 @@ function maritalStatus(isSingle) {
   return isSingle ? 'Soltera' : 'Casada/Unión libre'
 }
 
+/** Fecha `YYYY-MM-DD` → `DD/MM/YYYY` (mismo formato que la app móvil). */
+function formatDateString(value) {
+  if (!value) return '-'
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value)
+}
+
 function yesNo(value) {
   return value ? 'Sí' : 'No'
 }
@@ -175,6 +196,13 @@ function buildGeneralRows(patients, latestByPatient) {
       yesNo(patient.has_multiple_pregnancy),
       yesNo(patient.is_nulliparous),
       yesNo(patient.has_pregestational_diabetes),
+      yesNo(patient.has_chronic_hypertension),
+      yesNo(patient.has_renal_disease),
+      yesNo(patient.has_lupus),
+      yesNo(patient.has_antiphospholipid_syndrome),
+      yesNo(patient.has_abnormal_pregnancy_interval),
+      yesNo(patient.has_family_preeclampsia_history),
+      yesNo(patient.has_assisted_reproduction),
       latest ? `${latest.systolic}` : 'Sin datos',
       latest ? `${latest.diastolic}` : 'Sin datos',
       latest ? riskTitle(latest.risk_level) : 'Sin datos',
@@ -186,7 +214,9 @@ function buildPatientInfoRows(patient) {
   const rows = [
     ['Nombre', patient.full_name],
     ['Documento', patient.document_id],
+    ['Numero de historia clinica', patient.clinical_history_number ?? '-'],
     ['Edad', `${patient.age}`],
+    ['Fecha de nacimiento', formatDateString(patient.birth_date)],
     ['Semanas de gestacion', `${patient.gestation_weeks}`],
     ['Talla (m)', heightInMeters(patient.height_cm)],
     ['Peso (kg)', trimZero(patient.weight_kg)],
@@ -197,6 +227,13 @@ function buildPatientInfoRows(patient) {
     ['Embarazo gemelar o múltiple', yesNo(patient.has_multiple_pregnancy)],
     ['Nuliparidad', yesNo(patient.is_nulliparous)],
     ['Diabetes pregestacional', yesNo(patient.has_pregestational_diabetes)],
+    ['Hipertensión crónica preexistente', yesNo(patient.has_chronic_hypertension)],
+    ['Enfermedad renal', yesNo(patient.has_renal_disease)],
+    ['Lupus eritematoso sistémico', yesNo(patient.has_lupus)],
+    ['Síndrome antifosfolípido', yesNo(patient.has_antiphospholipid_syndrome)],
+    ['Intervalo intergenésico anormal', yesNo(patient.has_abnormal_pregnancy_interval)],
+    ['Antecedentes familiares de preeclampsia', yesNo(patient.has_family_preeclampsia_history)],
+    ['Fecundación asistida (TRA)', yesNo(patient.has_assisted_reproduction)],
     ['Teléfono', patient.phone ?? '-'],
     ['Dirección', patient.address ?? '-'],
   ]
@@ -249,6 +286,13 @@ function profileColumns(patient) {
     yesNo(patient.has_multiple_pregnancy),
     yesNo(patient.is_nulliparous),
     yesNo(patient.has_pregestational_diabetes),
+    yesNo(patient.has_chronic_hypertension),
+    yesNo(patient.has_renal_disease),
+    yesNo(patient.has_lupus),
+    yesNo(patient.has_antiphospholipid_syndrome),
+    yesNo(patient.has_abnormal_pregnancy_interval),
+    yesNo(patient.has_family_preeclampsia_history),
+    yesNo(patient.has_assisted_reproduction),
   ]
 }
 

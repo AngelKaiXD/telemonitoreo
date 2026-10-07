@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Copy, Save } from 'lucide-react'
+import {
+  ArrowLeft,
+  ClipboardList,
+  Copy,
+  HeartPulse,
+  Ruler,
+  Save,
+  Scale,
+  TriangleAlert,
+  UserRound,
+} from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import {
   assignPatientToDoctor,
@@ -17,14 +27,53 @@ function uuidv4() {
   return crypto.randomUUID()
 }
 
-const TOGGLE_FIELDS = [
-  { key: 'has_hypertension_history', label: 'Antecedente de hipertensión' },
-  { key: 'has_preeclampsia_history', label: 'Antecedente de preeclampsia' },
-  { key: 'is_single', label: 'Estado civil: soltera' },
-  { key: 'has_multiple_pregnancy', label: 'Embarazo gemelar o múltiple' },
-  { key: 'is_nulliparous', label: 'Primigravidez / nuliparidad' },
-  { key: 'has_pregestational_diabetes', label: 'Diabetes pregestacional' },
-]
+function ToggleRow({ label, checked, onChange }) {
+  return (
+    <div className="toggle-row">
+      <span className="toggle-label">{label}</span>
+      <label className="toggle-switch">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="toggle-track" />
+      </label>
+    </div>
+  )
+}
+
+/** Indicador calculado por el sistema: no es un campo editable. */
+function Chip({ icon: Icon, label, helper, active = false }) {
+  return (
+    <div className={`form-chip${active ? ' form-chip-warning' : ''}`}>
+      <Icon size={16} />
+      <div className="form-chip-text">
+        <strong>{label}</strong>
+        <span className="form-chip-helper">{helper}</span>
+      </div>
+    </div>
+  )
+}
+
+function FormSection({ icon: Icon, title, subtitle, children }) {
+  return (
+    <section className="card form-section">
+      <div className="form-section-head">
+        <span className="form-section-icon">
+          <Icon size={22} />
+        </span>
+        <div>
+          <h3>{title}</h3>
+          <span className="form-section-subtitle">{subtitle}</span>
+        </div>
+      </div>
+      <div className="form-grid">{children}</div>
+    </section>
+  )
+}
+
+const EXTREME_AGE_THRESHOLDS = { maxTeen: 18, maxMaternal: 35 }
 
 export default function PatientFormPage() {
   const { id } = useParams()
@@ -42,19 +91,28 @@ export default function PatientFormPage() {
   const [form, setForm] = useState({
     full_name: '',
     document_id: '',
+    clinical_history_number: '',
     age: '',
+    birth_date: '',
     gestation_weeks: '',
     height_cm: '',
     weight_kg: '',
     altitude: '4000',
     phone: '',
     address: '',
-    has_hypertension_history: false,
-    has_preeclampsia_history: false,
     is_single: false,
+    has_hypertension_history: false,
+    has_chronic_hypertension: false,
     has_multiple_pregnancy: false,
-    is_nulliparous: false,
     has_pregestational_diabetes: false,
+    has_renal_disease: false,
+    has_lupus: false,
+    has_antiphospholipid_syndrome: false,
+    is_nulliparous: false,
+    has_abnormal_pregnancy_interval: false,
+    has_preeclampsia_history: false,
+    has_family_preeclampsia_history: false,
+    has_assisted_reproduction: false,
   })
 
   useEffect(() => {
@@ -73,7 +131,9 @@ export default function PatientFormPage() {
         setForm({
           full_name: row.full_name ?? '',
           document_id: row.document_id ?? '',
+          clinical_history_number: row.clinical_history_number ?? '',
           age: row.age != null ? String(row.age) : '',
+          birth_date: row.birth_date ?? '',
           gestation_weeks:
             row.gestation_weeks != null ? String(row.gestation_weeks) : '',
           height_cm: row.height_cm != null ? String(row.height_cm) : '',
@@ -81,14 +141,27 @@ export default function PatientFormPage() {
           altitude: row.altitude != null ? String(row.altitude) : '4000',
           phone: row.phone ?? '',
           address: row.address ?? '',
-          has_hypertension_history: Boolean(row.has_hypertension_history),
-          has_preeclampsia_history: Boolean(row.has_preeclampsia_history),
           is_single: Boolean(row.is_single),
+          has_hypertension_history: Boolean(row.has_hypertension_history),
+          has_chronic_hypertension: Boolean(row.has_chronic_hypertension),
           has_multiple_pregnancy: Boolean(row.has_multiple_pregnancy),
-          is_nulliparous: Boolean(row.is_nulliparous),
           has_pregestational_diabetes: Boolean(
             row.has_pregestational_diabetes,
           ),
+          has_renal_disease: Boolean(row.has_renal_disease),
+          has_lupus: Boolean(row.has_lupus),
+          has_antiphospholipid_syndrome: Boolean(
+            row.has_antiphospholipid_syndrome,
+          ),
+          is_nulliparous: Boolean(row.is_nulliparous),
+          has_abnormal_pregnancy_interval: Boolean(
+            row.has_abnormal_pregnancy_interval,
+          ),
+          has_preeclampsia_history: Boolean(row.has_preeclampsia_history),
+          has_family_preeclampsia_history: Boolean(
+            row.has_family_preeclampsia_history,
+          ),
+          has_assisted_reproduction: Boolean(row.has_assisted_reproduction),
         })
       } catch (loadError) {
         if (!cancelled) {
@@ -112,6 +185,14 @@ export default function PatientFormPage() {
     if (!height || !weight || height <= 0) return null
     return weight / Math.pow(height / 100, 2)
   }, [form.height_cm, form.weight_kg])
+
+  const ageNumber = Number(form.age)
+  const extremeAge =
+    form.age.trim() !== '' &&
+    Number.isInteger(ageNumber) &&
+    (ageNumber < EXTREME_AGE_THRESHOLDS.maxTeen ||
+      ageNumber > EXTREME_AGE_THRESHOLDS.maxMaternal)
+  const obese = imc != null && imc >= 30
 
   function setField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -148,17 +229,26 @@ export default function PatientFormPage() {
       const shared = {
         full_name: form.full_name.trim(),
         document_id: form.document_id.trim(),
+        clinical_history_number: form.clinical_history_number.trim() || null,
         age: Number(form.age),
+        birth_date: form.birth_date || null,
         gestation_weeks: Number(form.gestation_weeks),
         height_cm: Number(form.height_cm),
         weight_kg: Number(form.weight_kg),
         altitude: Number(form.altitude),
-        has_hypertension_history: form.has_hypertension_history,
-        has_preeclampsia_history: form.has_preeclampsia_history,
         is_single: form.is_single,
+        has_hypertension_history: form.has_hypertension_history,
+        has_chronic_hypertension: form.has_chronic_hypertension,
         has_multiple_pregnancy: form.has_multiple_pregnancy,
-        is_nulliparous: form.is_nulliparous,
         has_pregestational_diabetes: form.has_pregestational_diabetes,
+        has_renal_disease: form.has_renal_disease,
+        has_lupus: form.has_lupus,
+        has_antiphospholipid_syndrome: form.has_antiphospholipid_syndrome,
+        is_nulliparous: form.is_nulliparous,
+        has_abnormal_pregnancy_interval: form.has_abnormal_pregnancy_interval,
+        has_preeclampsia_history: form.has_preeclampsia_history,
+        has_family_preeclampsia_history: form.has_family_preeclampsia_history,
+        has_assisted_reproduction: form.has_assisted_reproduction,
         phone: form.phone.trim() || null,
         address: form.address.trim() || null,
       }
@@ -230,8 +320,12 @@ export default function PatientFormPage() {
 
       {error && <ErrorBanner message={error} />}
 
-      <form className="card" onSubmit={handleSubmit}>
-        <div className="form-grid">
+      <form onSubmit={handleSubmit}>
+        <FormSection
+          icon={UserRound}
+          title="Datos personales"
+          subtitle="Identificación de la gestante"
+        >
           <div className="field">
             <label htmlFor="full_name">Nombre completo</label>
             <input
@@ -257,6 +351,21 @@ export default function PatientFormPage() {
               )}
             </div>
             <div className="field">
+              <label htmlFor="clinical_history_number">
+                N.º de historia clínica (opcional)
+              </label>
+              <input
+                id="clinical_history_number"
+                value={form.clinical_history_number}
+                onChange={(e) =>
+                  setField('clinical_history_number', e.target.value)
+                }
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="field">
               <label htmlFor="age">Edad</label>
               <input
                 id="age"
@@ -269,36 +378,48 @@ export default function PatientFormPage() {
                 <span className="field-msg">{fieldErrors.age}</span>
               )}
             </div>
+            <div className="field">
+              <label htmlFor="birth_date">Fecha de nacimiento (opcional)</label>
+              <input
+                id="birth_date"
+                type="date"
+                value={form.birth_date}
+                onChange={(e) => setField('birth_date', e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="form-row">
             <div className="field">
-              <label htmlFor="gestation_weeks">Semanas de gestación</label>
+              <label htmlFor="phone">Teléfono (opcional)</label>
               <input
-                id="gestation_weeks"
-                type="number"
-                min="0"
-                value={form.gestation_weeks}
-                onChange={(e) => setField('gestation_weeks', e.target.value)}
+                id="phone"
+                value={form.phone}
+                onChange={(e) => setField('phone', e.target.value)}
               />
-              {fieldErrors.gestation_weeks && (
-                <span className="field-msg">{fieldErrors.gestation_weeks}</span>
-              )}
             </div>
             <div className="field">
-              <label htmlFor="altitude">Altitud (msnm)</label>
+              <label htmlFor="address">Dirección (opcional)</label>
               <input
-                id="altitude"
-                type="number"
-                value={form.altitude}
-                onChange={(e) => setField('altitude', e.target.value)}
+                id="address"
+                value={form.address}
+                onChange={(e) => setField('address', e.target.value)}
               />
-              {fieldErrors.altitude && (
-                <span className="field-msg">{fieldErrors.altitude}</span>
-              )}
             </div>
           </div>
 
+          <ToggleRow
+            label="Estado civil: soltera"
+            checked={form.is_single}
+            onChange={(checked) => setField('is_single', checked)}
+          />
+        </FormSection>
+
+        <FormSection
+          icon={Ruler}
+          title="Parámetros antropométricos"
+          subtitle="Peso y talla de la gestante"
+        >
           <div className="form-row">
             <div className="field">
               <label htmlFor="height_cm">Talla (cm)</label>
@@ -330,65 +451,195 @@ export default function PatientFormPage() {
             </div>
           </div>
 
-          {imc != null && (
-            <p className="field-hint" style={{ margin: 0 }}>
-              IMC calculado: {imc.toFixed(1)}
-            </p>
-          )}
+          <Chip
+            icon={Scale}
+            label={imc != null ? `IMC ${imc.toFixed(1)}` : 'IMC pendiente'}
+            helper={
+              imc == null
+                ? 'Se calcula al registrar peso y talla'
+                : obese
+                  ? 'Obesidad (IMC ≥ 30)'
+                  : 'Peso normal / sobrepeso'
+            }
+            active={obese}
+          />
+        </FormSection>
 
+        <FormSection
+          icon={HeartPulse}
+          title="Parámetros clínicos"
+          subtitle="Datos del embarazo actual"
+        >
           <div className="form-row">
             <div className="field">
-              <label htmlFor="phone">Teléfono (opcional)</label>
+              <label htmlFor="gestation_weeks">Semanas de gestación</label>
               <input
-                id="phone"
-                value={form.phone}
-                onChange={(e) => setField('phone', e.target.value)}
+                id="gestation_weeks"
+                type="number"
+                min="0"
+                value={form.gestation_weeks}
+                onChange={(e) =>
+                  setField('gestation_weeks', e.target.value)
+                }
               />
+              {fieldErrors.gestation_weeks && (
+                <span className="field-msg">
+                  {fieldErrors.gestation_weeks}
+                </span>
+              )}
             </div>
             <div className="field">
-              <label htmlFor="address">Dirección (opcional)</label>
+              <label htmlFor="altitude">Altitud (msnm)</label>
               <input
-                id="address"
-                value={form.address}
-                onChange={(e) => setField('address', e.target.value)}
+                id="altitude"
+                type="number"
+                value={form.altitude}
+                onChange={(e) => setField('altitude', e.target.value)}
               />
+              {fieldErrors.altitude && (
+                <span className="field-msg">{fieldErrors.altitude}</span>
+              )}
             </div>
           </div>
+        </FormSection>
 
-          <div className="card" style={{ marginTop: 8 }}>
-            <div className="card-header">
-              <h3>Antecedentes y condiciones</h3>
-            </div>
-            {TOGGLE_FIELDS.map(({ key, label }) => (
-              <div className="toggle-row" key={key}>
-                <span className="toggle-label">{label}</span>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={form[key]}
-                    onChange={(e) => setField(key, e.target.checked)}
-                  />
-                  <span className="toggle-track" />
-                </label>
-              </div>
-            ))}
-          </div>
+        <FormSection
+          icon={TriangleAlert}
+          title="Factores de riesgo alto"
+          subtitle="Cualquier factor positivo clasifica como alto riesgo"
+        >
+          <ToggleRow
+            label="Hipertensión en embarazo anterior"
+            checked={form.has_hypertension_history}
+            onChange={(checked) =>
+              setField('has_hypertension_history', checked)
+            }
+          />
+          <ToggleRow
+            label="Hipertensión crónica preexistente"
+            checked={form.has_chronic_hypertension}
+            onChange={(checked) =>
+              setField('has_chronic_hypertension', checked)
+            }
+          />
+          <ToggleRow
+            label="Embarazo múltiple"
+            checked={form.has_multiple_pregnancy}
+            onChange={(checked) =>
+              setField('has_multiple_pregnancy', checked)
+            }
+          />
+          <ToggleRow
+            label="Diabetes"
+            checked={form.has_pregestational_diabetes}
+            onChange={(checked) =>
+              setField('has_pregestational_diabetes', checked)
+            }
+          />
+          <ToggleRow
+            label="Enfermedad renal"
+            checked={form.has_renal_disease}
+            onChange={(checked) => setField('has_renal_disease', checked)}
+          />
+          <ToggleRow
+            label="Lupus eritematoso sistémico"
+            checked={form.has_lupus}
+            onChange={(checked) => setField('has_lupus', checked)}
+          />
+          <ToggleRow
+            label="Síndrome antifosfolípido"
+            checked={form.has_antiphospholipid_syndrome}
+            onChange={(checked) =>
+              setField('has_antiphospholipid_syndrome', checked)
+            }
+          />
+        </FormSection>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-            <button
-              className="btn btn-outline"
-              type="button"
-              onClick={() =>
-                navigate(isEditing ? `/pacientes/${id}` : '/pacientes')
-              }
-            >
-              Cancelar
-            </button>
-            <button className="btn btn-primary" type="submit" disabled={saving}>
-              {saving ? <Spinner size={16} /> : <Save size={16} />}
-              {isEditing ? 'Actualizar paciente' : 'Guardar paciente'}
-            </button>
-          </div>
+        <FormSection
+          icon={Scale}
+          title="Factores de riesgo moderado"
+          subtitle="Marcados automáticamente cuando aplican"
+        >
+          <ToggleRow
+            label="Nuliparidad (primer embarazo)"
+            checked={form.is_nulliparous}
+            onChange={(checked) => setField('is_nulliparous', checked)}
+          />
+          <Chip
+            icon={TriangleAlert}
+            label="Edad materna extrema"
+            helper={
+              form.age.trim() === ''
+                ? 'Requiere edad'
+                : extremeAge
+                  ? `Presente (${form.age} años)`
+                  : `No presente (${form.age} años)`
+            }
+            active={extremeAge}
+          />
+          <Chip
+            icon={TriangleAlert}
+            label="Obesidad (IMC ≥ 30)"
+            helper={
+              imc == null
+                ? 'Requiere peso y talla'
+                : obese
+                  ? `Presente (IMC ${imc.toFixed(1)})`
+                  : `No presente (IMC ${imc.toFixed(1)})`
+            }
+            active={obese}
+          />
+          <ToggleRow
+            label="Intervalo intergenésico anormal"
+            checked={form.has_abnormal_pregnancy_interval}
+            onChange={(checked) =>
+              setField('has_abnormal_pregnancy_interval', checked)
+            }
+          />
+        </FormSection>
+
+        <FormSection
+          icon={ClipboardList}
+          title="Otros factores de riesgo"
+          subtitle="Antecedentes personales y familiares"
+        >
+          <ToggleRow
+            label="Antecedente de preeclampsia / eclampsia"
+            checked={form.has_preeclampsia_history}
+            onChange={(checked) =>
+              setField('has_preeclampsia_history', checked)
+            }
+          />
+          <ToggleRow
+            label="Antecedentes familiares de preeclampsia"
+            checked={form.has_family_preeclampsia_history}
+            onChange={(checked) =>
+              setField('has_family_preeclampsia_history', checked)
+            }
+          />
+          <ToggleRow
+            label="Fecundación asistida (TRA)"
+            checked={form.has_assisted_reproduction}
+            onChange={(checked) =>
+              setField('has_assisted_reproduction', checked)
+            }
+          />
+        </FormSection>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button
+            className="btn btn-outline"
+            type="button"
+            onClick={() =>
+              navigate(isEditing ? `/pacientes/${id}` : '/pacientes')
+            }
+          >
+            Cancelar
+          </button>
+          <button className="btn btn-primary" type="submit" disabled={saving}>
+            {saving ? <Spinner size={16} /> : <Save size={16} />}
+            {isEditing ? 'Actualizar paciente' : 'Guardar paciente'}
+          </button>
         </div>
       </form>
 

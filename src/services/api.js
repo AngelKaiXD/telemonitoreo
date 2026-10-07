@@ -16,7 +16,7 @@ export async function getCurrentProfile(userId) {
 // ── Patients ─────────────────────────────────────────────────────────────────
 
 const PATIENT_COLUMNS =
-  'id, full_name, document_id, age, gestation_weeks, height_cm, weight_kg, altitude, has_hypertension_history, has_preeclampsia_history, is_single, has_multiple_pregnancy, is_nulliparous, has_pregestational_diabetes, phone, address, link_code, is_active, created_at'
+  'id, full_name, document_id, age, gestation_weeks, height_cm, weight_kg, altitude, has_hypertension_history, has_preeclampsia_history, is_single, has_multiple_pregnancy, is_nulliparous, has_pregestational_diabetes, has_chronic_hypertension, has_renal_disease, has_lupus, has_antiphospholipid_syndrome, has_abnormal_pregnancy_interval, has_family_preeclampsia_history, has_assisted_reproduction, clinical_history_number, birth_date, phone, address, link_code, is_active, created_at'
 
 /**
  * Pacientes visibles para el rol autenticado. Por defecto excluye las
