@@ -37,11 +37,6 @@ const READING_HEADERS = [
   'Fecha',
   'Presion',
   'Pulso',
-  'Glucosa',
-  'Estres',
-  'Act. fisica',
-  'Sal',
-  'Ctrl. prenatal',
   'Antecedente',
   'Riesgo',
   'Diagnostico',
@@ -143,12 +138,6 @@ function formatDateString(value) {
 
 function yesNo(value) {
   return value ? 'Sí' : 'No'
-}
-
-function glucoseText(value) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return '-'
-  return Number.isInteger(number) ? number.toFixed(1) : String(number)
 }
 
 function bloodPressure(systolic, diastolic) {
@@ -257,11 +246,6 @@ function readingRow(reading) {
     formatBoliviaReport(reading.recorded_at),
     bloodPressure(reading.systolic, reading.diastolic),
     `${reading.heart_rate} bpm`,
-    glucoseText(reading.glucose),
-    `${reading.stress}`,
-    `${reading.physical_activity}`,
-    `${reading.salt_consumption}`,
-    `${reading.prenatal_control}`,
     yesNo(Number(reading.has_background) === 1),
     riskTitle(reading.risk_level),
     reading.diagnosis,
@@ -585,7 +569,7 @@ export async function generateIndividualExcel(patient, readings) {
   writeWorkbook(
     'Reporte clinico',
     buildIndividualAoa(patient, safeReadings),
-    [16, 20, 10, 12, 20, 12, 14, 13, 14, 13, 13, 13, 40],
+    [16, 20, 10, 14, 13, 13, 13, 40],
     `reporte_${safeName(patient.full_name)}_${fileDate()}.xlsx`,
   )
 }
